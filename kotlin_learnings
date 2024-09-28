@@ -1,0 +1,11 @@
+https://kotlinlang.org/docs/getting-started.html
+https://play.kotlinlang.org/
+https://www.youtube.com/watch?v=NosAkIKgA4Y&list=PLRKyZvuMYSIMW3-rSOGCkPlO1z_IYJy3G&ab_channel=CheezyCode
+
+Kotlin - statically typed language - at compile time checking done
+OOPS and functional language
+var -> used to declare mutable variable
+val -> used to declare constant variable
+
+To explicitly define data type-> var score : Int = 12
+To convert any integer to float=> i.toFloat()
