@@ -17,8 +17,10 @@ fun main(){
  var j = 11
  var result = i == 10 || j++ == 11
  println(i) //10
- println(j) //11 - here shortcircuiting happened as part of code after or operator didn't execute
+ println(j) //11 - here shortcircuiting happened as part of code after OR operator didn't execute
 }
+
+Similar shortcircuiting can be done in case of AND operator
 
 
 If else statement as expression-
@@ -41,3 +43,42 @@ print(result) //Odd
 }
 
 Kotlin doesnot have ternary operator as like other languages
+
+Range->
+fun main(){
+val number = 5
+val result = number in 1..5 //1,2,3,4,5
+val result1 = number in 1 until 5 // here upper bound 5 will not be included
+println(result)//true
+println(result1)//false
+}
+
+Use of when in kotlin-> when is similar to switch case in other programming languages
+
+fun main(){
+val animal = "Dog"
+when(animal){
+"Horse" -> println("Animal is horse")
+"Cat" -> println("Animal is cat")
+"Dog" -> println("Animal is Dog")
+else -> println("Animal not found")
+}
+}
+O/p: Animal is Dog
+
+Use of range in when->
+
+fun main(){
+val number = 15
+val result = when(number){
+11 -> "Eleven"
+12 -> "Twelve"
+in 13..19 -> "Teen"
+else -> "Not in range"
+}
+println(result)
+}
+O/p: Teen
+
+
+
