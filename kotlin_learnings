@@ -9,3 +9,13 @@ val -> used to declare constant variable
 
 To explicitly define data type-> var score : Int = 12
 To convert any integer to float=> i.toFloat()
+
+Shortcircuiting:
+
+fun main(){
+ var i = 10
+ var j = 11
+ var result = i == 10 || j++ == 11
+ println(i) //10
+ println(j) //11 - here shortcircuiting happened as part of code after or operator didn't execute
+}
