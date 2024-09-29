@@ -19,3 +19,25 @@ fun main(){
  println(i) //10
  println(j) //11 - here shortcircuiting happened as part of code after or operator didn't execute
 }
+
+
+If else statement as expression-
+
+fun main(){
+ val number = 21
+ val result = if(number % 2 == 0){
+                  "Even"
+              } else{
+                   "Odd"
+              }
+print(result) //Odd
+}
+
+This can be rewritten as- 
+fun main(){
+val number = 21
+val result = if(number % 2 == 0) "Even" else "Odd"
+print(result) //Odd
+}
+
+Kotlin doesnot have ternary operator as like other languages
