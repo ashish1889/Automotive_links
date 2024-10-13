@@ -1,0 +1,89 @@
+// Channel Core to Code, Playlist – Linux Basics 
+
+//On execution of below code in Ubuntu system-
+//This file is low_level_file_ops.cpp 
+// Compilation steps - https://stackoverflow.com/questions/3178342/compiling-a-c-program-with-gcc
+
+#include <iostream>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+using namespace std;
+
+int main()
+{
+	int fd1, fd2;
+
+	fd1 = open("test1.txt",  O_CREAT|O_TRUNC | O_RDWR);
+	cout << fd1 << endl;
+	fd2 = open("test2.txt", O_CREAT|O_TRUNC|O_RDWR);
+	cout << fd2 << endl;
+	close(fd1);
+	close(fd2);
+	return 0;
+}
+
+O/p-
+-1
+-1
+========================================================================================================================================================
+//Code is syscall_test.cpp
+
+#include <iostream>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/syscall.h>
+using namespace std;
+
+int main()
+{
+	int rc;
+
+	rc = system("ls -l");
+	cout << rc << endl;
+	system("touch test.txt");
+	system("ls -l");
+	system("pwd");
+	rc = syscall(SYS_access, "./test.txt");
+	if (rc == -1)
+		cout << "sys access error" << endl;
+	else
+		cout << "File accessible" << endl;
+
+	rc = syscall(SYS_access, "./test.txt", R_OK);
+	if (rc == -1)
+		cout << "No Read permission" << endl;
+	else
+		cout << "Read ok" << endl;
+
+	rc = syscall(SYS_access, "./test.txt", X_OK);
+	if (rc == -1)
+		cout << "No Execute permission" << endl;
+	else
+		cout << "Execute ok" << endl;
+
+	system("strace ls");
+	return 0;
+}
+
+O/p-
+
+total 24
+-rwxr-xr-x 1 ashishm22 domain users 13160 Dec 14  2020 a.out
+drwxr-xr-x 2 ashishm22 domain users  4096 Dec 14  2020 Debug
+-rw-r--r-- 1 ashishm22 domain users   693 Dec 14  2020 syscall_test.cpp
+0
+total 24
+-rwxr-xr-x 1 ashishm22 domain users 13160 Dec 14  2020 a.out
+drwxr-xr-x 2 ashishm22 domain users  4096 Dec 14  2020 Debug
+-rw-r--r-- 1 ashishm22 domain users   693 Dec 14  2020 syscall_test.cpp
+-rw-r--r-- 1 ashishm22 domain users     0 Oct 13 14:47 test.txt
+/home/ashishm22/Desktop/trainings/virtual_genesis_linux_system_programing/Day_1_-_SysCallsLowLevelFIlesProjects/SyscallsTestProject
+File accessible
+Read ok
+No Execute permission
+
+
+
+
