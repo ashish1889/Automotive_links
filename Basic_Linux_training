@@ -84,6 +84,13 @@ File accessible
 Read ok
 No Execute permission
 
+=======================================================================================================================================================================================
+To do tasks-
+    1. Create file size of 4K bytes and check size (ls -lsh). Add one more byte and check again. It would be now 8k bytes from 4k bytes.
+    2. Calculate number of bytes it can address for triple indirection block.
+    3. Execute chmod with absolute mode (or numeric way) (Read as 4, write as 2 and execute as 1) as we performed with symbolic mode. Perform both for files and directories.
+    4. Try I/O redirection (<, 0<, >, >>, 1>, 2>) with another commands (we tested with ls), say with cat on non existent file or with any other commands which gives error along with successful output.
+
 
 
 
