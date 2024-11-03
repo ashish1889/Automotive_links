@@ -217,7 +217,21 @@ Hello 2
 Hello 3
 Hello 1
 Hello 2
+==============================================================================================================================================================
+//Storing function in variable
 
+fun main() {
+    var fn = ::addition // Here function is stored in variable using ::
+    println(fn(3.0,5.0))
+    
+}
+
+fun addition(num1: Double,num2: Double):Double{
+    return num1+num2
+}
+
+O/p-
+8.0
 
 
 
