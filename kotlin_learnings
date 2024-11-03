@@ -233,6 +233,55 @@ fun addition(num1: Double,num2: Double):Double{
 O/p-
 8.0
 
+===========================================================================================================================================================
+//Arrays in Kotlin-
+
+fun main() {
+   val songs = arrayOf("Hello", "Final Countdown", "Highway To Hell")   
+   
+   //length of the array
+   println(songs.size) // --> 3
+   
+   //Set the value
+   songs[1] = "In the End"
+    
+   //check if array contains particular element
+   println(songs.contains("Hello")) // --> true
+   
+   //index of a particular element
+   println(songs.indexOf("Highway To Hell")) // --> 2
+  
+}
+
+O/p-
+3
+true
+2
+
+fun main() {
+   val songs = arrayOf("Hello", "Final Countdown", "Highway To Hell")   
+   
+   for(song in songs) {
+     println(song)
+   }
+   
+   //with index
+   for( (index, song) in songs.withIndex()){
+     println(index.toString() + " - " + song)     
+   }
+  
+}
+
+O/p-
+Hello
+Final Countdown
+Highway To Hell
+0 - Hello
+1 - Final Countdown
+2 - Highway To Hell
+
+=========================================================================================================================================================================================
+
 
 
 
