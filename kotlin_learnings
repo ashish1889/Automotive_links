@@ -282,8 +282,35 @@ Highway To Hell
 
 =========================================================================================================================================================================================
 
+//class and object in kotlin
 
+fun main() {
+    val mustang = Car("mustang", "petrol") //Object creation
+    val beetle = Car("beetle", "diesel")
 
+    println(mustang.name)
+    println(beetle.name)
+
+    mustang.driveCar()
+    beetle.driveCar()
+}
+
+class Car (val name: String, val type : String) //Class properties are passed as params
+{
+    fun driveCar(){
+        println("$name Car is driving")
+    }
+
+    fun applyBrakes(){
+        println("Applied Brakes")
+    }
+}
+
+O/p-
+mustang
+beetle
+mustang Car is driving
+beetle Car is driving
 
 
 
