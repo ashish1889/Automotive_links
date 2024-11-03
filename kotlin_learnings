@@ -167,6 +167,58 @@ O/p=>
 2 X 9 = 18
 2 X 10 = 20
 
+==========================================================================================================================================================================================
+//Kotlin function and default arguments=>
+fun main() {
+    println(add(3,5))
+    evenOrOdd(6)
+    println(addInline(7,8))
+    println(addInlineExplicit(7,7))
+    printMessage(3) // This will print from 1 to 3
+    printMessage() // This will print from 1 to 2
+}
+
+fun add(num1:Int,num2:Int):Int{
+    val result= num1+num2;
+    return result;
+}
+
+fun evenOrOdd(num:Int){ // when there is no return type so by default return type is Unit
+    val result = if(num%2 == 0)"Even" else "Odd"
+    println(result)
+    
+}
+
+//Inline function
+
+fun addInline(num1:Int,num2:Int):Int = num1+num2
+
+//Inline function - Explicit declaration
+
+fun addInlineExplicit(num1:Int,num2:Int)= num1+num2
+
+//Use of default arguments in function
+
+fun printMessage(count:Int = 2){
+    //here count is of val type so can't be reassigned
+    for(i in 1..count){
+        println("Hello $i")
+    }
+    
+}
+
+O/p-
+8
+Even
+15
+14
+Hello 1
+Hello 2
+Hello 3
+Hello 1
+Hello 2
+
+
 
 
 
