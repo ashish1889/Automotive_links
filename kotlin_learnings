@@ -356,7 +356,7 @@ fun main() {
   {   init{
       println("Before secondary constructor")
   }
-      constructor(nameParam: String): this(nameParam, 3, 3) //secondary constructor
+      constructor(nameParam: String): this(nameParam, 3, 3) //secondary constructor- here nameParam is not the property of the class
       
       init{
       println("After secondary constructor")
