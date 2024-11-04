@@ -370,5 +370,70 @@ Before secondary constructor
 After secondary constructor
 3
 
+================================================================================================================================================================================================
+Setters and Getters in Android-
+
+fun main() {
+    val user = User("John", 20, "ABC@cheezycode.com")
+    user.age = -10
+    println(user.email)
+}
+
+class User(nameParam: String, ageParam: Int, emailParam: String)
+{
+    var name : String = nameParam
+    var age: Int = ageParam
+    set(value) {
+        if(value < 0)
+        {
+            println("Age can't be negative")
+        }
+        else
+        {
+            field = value
+        }
+    }
+    var email: String = emailParam
+    get(){
+        return field.toLowerCase()
+    }
+}
+
+O/p-
+
+Age can't be negative
+abc@cheezycode.com
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Simple syntax for Getter & Setter - 
+var <propertyname>[: <propertytype>] [= <property_initializer>]
+    [<getter>]
+    [<setter>]
+
+
+LateInit In Kotlin -
+
+When you want to initialize the value to a property later in the program, you mark the property as lateinit. LateInit means late initialization.
+While setting up the constructor if you don't know the value to be assigned - you use lateinit.
+Lateinit property is declared as var because we have to assign it a value later in the program. We cannot define these properties as primitive types such as Int, Byte, Long, etc.
+If you try to access a lateinit variable before assigning it a value, you will get kotlin.UninitializedPropertyAccessException.
+
+
+fun main() {
+    val user = User()
+    user.setValue("John")
+    println(user.name)
+}
+
+class User
+{
+    lateinit var name:String
+    fun setValue(nameParam: String){
+        name = nameParam
+    }
+}
+
+O/p- 
+John
+=================================================================================================================================================================================================
 
 
