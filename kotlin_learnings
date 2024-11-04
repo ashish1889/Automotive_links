@@ -311,7 +311,64 @@ mustang
 beetle
 mustang Car is driving
 beetle Car is driving
+=============================================================================================================================================================================================
 
+Primary constructor-
+
+fun main() {
+    var car = Automobile("Car", 4, 4)   
+    var auto = Automobile("Auto", 3, 3)
+}
+
+class Automobile(val name: String, val tyres: Int, val maxSeating: Int) //Arguments with val are properties of class
+  {
+      init {
+          println("Init Block 1")
+      }
+    
+      fun drive() {}
+    
+      init {
+          println("Init Block 2")
+      }
+    
+      fun applyBrakes() {}
+  }
+
+O/p-
+Init Block 1
+Init Block 2
+Init Block 1
+Init Block 2
+
+=================================================================================================================================================================================================
+
+Secondary constructor-
+
+fun main() {
+      var car = Automobile("Car", 4, 4)   
+      var car2 = Automobile("Car2") 
+      
+      println(car2.tyres)
+  }
+
+  class Automobile(val name: String, val tyres: Int, val maxSeating: Int)
+  {   init{
+      println("Before secondary constructor")
+  }
+      constructor(nameParam: String): this(nameParam, 3, 3) //secondary constructor
+      
+      init{
+      println("After secondary constructor")
+  }
+  }
+
+O/p-
+Before secondary constructor
+After secondary constructor
+Before secondary constructor
+After secondary constructor
+3
 
 
 
