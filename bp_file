@@ -1,0 +1,285 @@
+contactbook-lib
+
+
+aidl_interface {
+    name: "BMWContactBookLib",
+    srcs: [
+        "src/**/*.aidl",
+    ],
+    local_include_dir: "src",
+    backend: {
+        java: {
+            sdk_version: "current",
+            enabled: true,
+        },
+        cpp: {
+            enabled: false,
+        },
+        ndk: {
+            enabled: false,
+        },
+    },
+    // this AIDL is only used by manager and service, which are located in
+    // the same repo, so it is already stable and does not need additional
+    // version checks
+
+    unstable: true,
+}
+
+
+================================================================================================================================
+contactbook-manager
+
+
+
+java_sdk_library {
+    name: "BMWContactBookManager",
+    srcs: [
+        "src/**/*.java",
+    ],
+    static_libs: [
+        "BMWContactBookLib-java",
+    ],
+    libs: [
+        "androidx.annotation_annotation",
+    ],
+    api_packages: [
+        "com.bmwgroup.apinext.contactbook.manager",
+    ],
+    platform_apis: true,
+    system_ext_specific: true,
+}
+
+droidstubs {
+    name: "BMWContactBookManager.docs",
+    srcs: ["src/**/*.java"],
+    annotations_enabled: true,
+    create_doc_stubs: true,
+}
+
+// Static library for testing
+java_library {
+    name: "BMWContactBookManagerLib",
+    installable: true,
+    srcs: [
+            "src/**/*.java",
+        ],
+    static_libs: [
+            "BMWContactBookManagerLib-java",
+            "vendor.bmw.contactbook-V1-java",
+            "androidx.annotation_annotation",
+        ],
+    optimize: {
+        enabled: false,
+    },
+    platform_apis: true,
+}
+
+filegroup {
+    name: "BMWContactBookManager.api.public.latest",
+    srcs: [
+        "api/current.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWContactBookManager-removed.api.public.latest",
+    srcs: [
+        "api/removed.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWContactBookManager-incompatibilities.api.public.latest",
+    srcs: [
+        "api/incompatibilities.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWContactBookManager.api.system.latest",
+    srcs: [
+        "api/system-current.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWContactBookManager-removed.api.system.latest",
+    srcs: [
+        "api/system-removed.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWContactBookManager-incompatibilities.api.system.latest",
+    srcs: [
+        "api/system-incompatibilities.txt",
+    ],
+}
+
+
+
+=====================================================================================================================================
+
+contactbook-service
+
+// Copy priveleged permissions to /system/etc/permissions
+prebuilt_etc {
+    name: "bmw-privapp-permissions-contactbook.xml",
+    src: "permissions/bmw-privapp-permissions-contactbook.xml",
+    sub_dir: "permissions",
+    system_ext_specific: true,
+}
+
+android_app {
+    name: "BMWContactBookService",
+    manifest: "AndroidManifest.xml",
+    static_libs: [
+        "BMWContactBookServiceLib",
+        "BMWContactBookLib-java",
+
+    ],
+    certificate: "platform",
+    system_ext_specific: true,
+    privileged: true,
+    platform_apis: true,
+    required: ["bmw-privapp-permissions-contactbook.xml"],
+}
+
+// Static library for testing
+java_library {
+name: "BMWContactBookServiceLib",
+installable: true,
+
+    srcs: [
+        "src/**/*.java",
+    ],
+    static_libs: [
+        "BMWContactBookLib-java",
+        "vendor.bmw.contactbook-V1-java",
+        "vendor.bmw.commonapi-V1-java",
+        "androidx.annotation_annotation",
+    ],
+
+    optimize: {
+        enabled: false,
+    },
+}
+
+
+==========================================================================================================================
+
+telephony-manager
+
+
+
+java_sdk_library {
+    name: "BMWTelephonyManager",
+    srcs: [
+        "src/**/*.java",
+    ],
+    static_libs: [
+        "vendor.bmw.telephonyprovider.telephonymanager-V1-java",
+    ],
+    libs: [
+        "androidx.annotation_annotation",
+    ],
+    api_packages: [
+        "com.bmwgroup.apinext.telephony.manager",
+        "com.bmwgroup.apinext.telephony.manager.callbacks",
+        "com.bmwgroup.apinext.telephony.manager.actions",
+        "com.bmwgroup.apinext.telephony.manager.data",
+        "com.bmwgroup.apinext.telephony.manager.types",
+    ],
+    sdk_version: "module_current",
+    product_specific: true,
+}
+
+droidstubs {
+    name: "BMWTelephonyManager.docs",
+    srcs: [
+        "src/com/bmwgroup/apinext/telephony/manager/actions/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/callbacks/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/data/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/types/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/BMWTelephonyManager.java",
+        "src/com/bmwgroup/apinext/telephony/manager/BMWTelephonyManagerVersion.java",
+        "src/com/bmwgroup/apinext/telephony/manager/ConnectionFailedException.java",
+        "src/com/bmwgroup/apinext/telephony/manager/ServiceNotReadyException.java"
+    ],
+    annotations_enabled: true,
+    create_doc_stubs: true,
+}
+
+// Static library for testing
+java_library {
+    name: "BMWTelephonyManagerLib",
+    installable: true,
+    srcs: [
+            "src/**/*.java",
+        ],
+    static_libs: [
+            "vendor.bmw.telephonyprovider.telephonymanager-V1-java",
+            "androidx.annotation_annotation",
+        ],
+    optimize: {
+        enabled: false,
+    },
+    platform_apis: true,
+}
+
+filegroup {
+    name: "BMWTelephonyManager.api.public.latest",
+    srcs: [
+        "api/current.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWTelephonyManager-removed.api.public.latest",
+    srcs: [
+        "api/removed.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWTelephonyManager-incompatibilities.api.public.latest",
+    srcs: [
+        "api/incompatibilities.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWTelephonyManager.api.system.latest",
+    srcs: [
+        "api/system-current.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWTelephonyManager-removed.api.system.latest",
+    srcs: [
+        "api/system-removed.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWTelephonyManager-incompatibilities.api.system.latest",
+    srcs: [
+        "api/system-incompatibilities.txt",
+    ],
+}
+
+filegroup {
+    name: "BMWTelephonyManagerDocSources",
+    srcs: [
+        "src/com/bmwgroup/apinext/telephony/manager/actions/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/callbacks/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/data/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/types/*.java",
+        "src/com/bmwgroup/apinext/telephony/manager/BMWTelephonyManager.java",
+        "src/com/bmwgroup/apinext/telephony/manager/ConnectionFailedException.java",
+        "src/com/bmwgroup/apinext/telephony/manager/ServiceNotReadyException.java",
+        "doc/**/*",
+    ],
+}
