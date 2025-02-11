@@ -1,0 +1,657 @@
+# Introduction
+
+The BMWTelephonyManager provides an abstraction for the boardnet interface (BMW.INFOTAINMENT.CONNECTIVITY.TELEPHONY.TelephonyManager) incapsulated into TelephonyProvider HAL for Telephony via Bluetooth (or C_ESIM) devices outside Android. Currently the only known clients are two BMTs (abbreviation for Bedienmodule-Tür) - remote controls with UI.
+
+![BMT](images/2023-bmw-7-series-i7-theater-screen-116.webp)
+![BMTs](images/2023-bmw-7-series-i7-theater-screen-110.webp)
+
+## General mode of operation
+
+At runtime, the Phone App (sole owner of all business logic) can connect via the BMWTelephonyManager to the BMWTelephonyService and provide information about current Telephony state and receive control requests from clients outside Android.
+
+## Architecture Overview
+
+{{< diagram >}}
+```mermaid
+    C4Component
+    Container_Boundary(driver, "Driver area") {
+    Container_Boundary(idc, "IDC") {
+        Container_Boundary(android, "Android") {
+            Container_Boundary(apps, "Android Apps") {
+                Component(phone_app, "Phone App", "", "")
+            }
+            BiRel(phone_app, manager, "SDK Addon")
+            Container_Boundary(framework, "Android Framework") {
+                Component(manager, "BMWTelephonyManager")
+                BiRel(manager, service, "ITelephonyMananer", "AIDL")
+                Component(service, "BMWTelephonyService")
+            }
+            BiRel(hal,service, "ITelephonyMananer", "AIDL")
+            Container_Boundary(platform, "Android Platfrom") {
+                Component(hal, "TelephonyProvider HAL Service", "", "")
+
+            }
+        }
+    }
+    }
+
+    BiRel(bmtl, hal, "Communicate", "SOME/IP")
+    BiRel(bmtr, hal, "Communicate", "SOME/IP")
+
+    Container_Boundary(pass, "Passengers area") {
+        System_Ext(bmtl, "BMT Left", "")
+        System_Ext(bmtr, "BMT Right", "")
+    }
+
+    UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
+```
+{{< /diagram >}}
+=====================================================================================================================================================================================================================
+
+# BMWTelephonyManager API
+
+A manager for providing the current state of telephony outside Android and redirecting requests from external clients to the application. The manager is intended to be used only by the Phone App.
+
+## Permissions
+
+In order to use the BMWTelephonyManager, the signature permission
+`com.bmwgroup.apinext.telephony.permission.TELEPHONY_CHECK` is required.
+
+## Callbacks
+
+Since BMWTelephonyManager is using asynchronious communication the Phone App should use callbacks to get replies, to receive events from clients and boardnet service state:
+ - [TelephonyServiceConnection](https://jira.cc.bmwgroup.net/browse/BANC-3105) - provides information on TelephonyService connection. The Phone App can use any API only if connection is true.
+ - [StateCallback](https://jira.cc.bmwgroup.net/browse/BANC-3105) - provides information on SOME/IP service (part of the HAL) state. Clients can use API only if state is ENABLED, except for the case of the initial configuration.
+ - [BMWTelephonyCallback](https://jira.cc.bmwgroup.net/browse/BANC-3105) - allows Phone App to receive events from clients. Two types of events are supported: Actions and Data.
+ - [DataSetCallback](https://jira.cc.bmwgroup.net/browse/BANC-3105) - provides result when Phone App is setting Data to the manager.
+
+## Supported Actions
+
+  - ANSWER
+  - DIAL
+  - HANGUP
+  - HOLD
+  - RESUME
+  - SEND_TONE
+  - SWAP_CALLS
+
+## Supported Data
+
+  - MICROPHONE_STATE
+  - AUDIO_ZONE
+  - HEADREST_AUDIO
+  - SCO_STATUS
+  - AGGREGATED_CALL_STATE
+  - AGGREGATED_CALL_STATE_REAR_SEAT
+  - COMMUNICATION_BLOCKED
+  - CONFERENCE_CALL_ONGOING
+  - TELEPHONY_DEVICE_LIST
+  - VOICE_CALL
+  - VR_SESSION_ACTIVE_ON_DEVICE_ADDRESS
+  - CALL_AUTO_REJECTED
+  - DISPLAY_CALL_STATUS_MESSAGE
+===============================================================================================================================================================================================================================
+
+# Sequences
+
+The following sequence diagrams show how to use the BMWTelephonyManager.
+
+## Initial connection
+
+Usecases:
+- [getInstance](https://jira.cc.bmwgroup.net/browse/BANC-2937)
+- [bind](https://jira.cc.bmwgroup.net/browse/BANC-2936)
+- [unbind](https://jira.cc.bmwgroup.net/browse/BANC-2944)
+- [registerCallback](https://jira.cc.bmwgroup.net/browse/BANC-2940)
+- [isBound](https://jira.cc.bmwgroup.net/browse/BANC-2939)
+- [setData](https://jira.cc.bmwgroup.net/browse/BANC-2942)
+- [setState](https://jira.cc.bmwgroup.net/browse/BANC-2943)
+
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Android
+        participant app as Phone App
+        participant manager as BMWTelephonyManager
+        participant service as BMWTelephonyService
+        participant hal as TelephonyManager HAL
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+    end
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    activate app
+    app->>manager: getInstance()
+    activate manager
+    app->>manager: bind(Context context, TelephonyServiceConnection connection)
+    manager-->>app: result: true|false
+    manager->>service: bind
+    activate service
+    service->>hal: bind
+    activate hal
+    break bind() return false
+        note right of app: System couldn't find the service<br/>You should call unbind() to release the connection
+        app->>manager:unbind(context)
+        note right of app: Continue to work without TelephonyManager
+    end
+    manager->>app:connection.onServiceConnection(int service, boolean status)
+    alt status is true or isBound() returns true
+    note over app, manager: All parameters must be initialised before the TelephonyManager<br/> service is put into the ENABLED state:<br/>MICROPHONE_STATE<br/>AUDIO_ZONE,<br/>HEADREST_AUDIO<br/>SCO_STATUS<br/>AGGREGATED_CALL_STATE<br/>AGGREGATED_CALL_STATE_REAR_SEAT<br/>COMMUNICATION_BLOCKED<br/>CONFERENCE_CALL_ONGOING<br/>TELEPHONY_DEVICE_LIST<br/>VOICE_CALL<br/>VR_SESSION_ACTIVE_ON_DEVICE_ADDRESS
+
+    note over app, manager: The CALL_AUTO_REJECTED and DISPLAY_CALL_STATUS_MESSAGE<br/> can be set only after the TelephonyManager<br/> service is put into the ENABLED state
+
+    app->>manager: setData(dataList, dataSetCallback)
+    manager->>service: setData(dataList, dataSetCallback)
+    service->>hal: setData(dataList, dataSetCallback)
+    hal->>hal: update values internally
+    hal->>service: dataSetCallback.setResults(List<DataSetResult> dataSetResult)
+    service->>manager: dataSetCallback.setResults(List<DataSetResult> dataSetResult)
+    manager->>app: dataSetCallback.setResults(List<DataSetResult> dataSetResult)
+
+    app->>manager: registerCallback(BMWTelephonyCallback callback)
+    manager->>service: registerCallback(BMWTelephonyCallback callback)
+    service->>hal: registerCallback(BMWTelephonyCallback callback)
+    hal->>hal: use callback
+
+    app->>manager: setState(ENABLED)
+    manager->>service: setState(ENABLED)
+    service->>hal: setState(ENABLED)
+    hal->>someip: start
+    activate someip
+    par
+        someip->>bmtl: send all parameters
+    and
+        someip->>bmtr: send all parameters
+    end
+
+    end
+    deactivate someip
+    deactivate hal
+    deactivate service
+    deactivate manager
+    deactivate app
+```
+{{< /diagram >}}
+
+## Callback removal
+
+Usecases:
+- [unregisterCallback](https://jira.cc.bmwgroup.net/browse/BANC-2945)
+- [unregisterStateCallback](https://jira.cc.bmwgroup.net/browse/BANC-2946)
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    participant app as Phone App
+    participant manager as BMWTelephonyManager
+
+    app->>manager: unregisterCallback(callback)
+    app->>manager: unregisterStateCallback(stateCallback)
+
+```
+{{< /diagram >}}
+
+## Disconnect
+
+Usecases:
+- [setState](https://jira.cc.bmwgroup.net/browse/BANC-2943)
+- [unbind](https://jira.cc.bmwgroup.net/browse/BANC-2944)
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    participant app as Phone App
+    participant manager as BMWTelephonyManager
+    participant service as BMWTelephonyService
+    participant hal as TelephonyManager HAL
+    participant someip as TelephonyManager<br/>SOME/IP service provider
+activate app
+activate manager
+activate service
+activate hal
+activate someip
+note over app, someip: App is bound and service status is ENABLED
+    app->>manager: setState(DISABLED)
+    manager->>service: setState(DISABLED)
+    service->>hal: setState(DISABLED)
+    hal->>someip: stop
+    deactivate someip
+    app->>manager: unbind(context)
+    manager->>service: unbind
+    service-->hal: HAL will be killed by Android
+    deactivate hal
+    deactivate service
+    deactivate manager
+    deactivate app
+```
+{{< /diagram >}}
+
+## Set Mic Muted by BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED
+note over bmtl, app: This action is possible from BMT only when VOICE_CALL exists
+    bmtl->>someip: setMicMuted(<params>)
+    someip->>manager: setMicMuted(<params>)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.setData(Data data[MICROPHONE_STATE, <params>])
+    app->>app: Process MICROPHONE_STATE request
+    note left of app: App updates MICROPHONE_STATE using setData() API
+```
+{{< /diagram >}}
+
+## Set Audio Zone by BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED
+note over bmtl, app: This action is possible from BMT only when VOICE_CALL exists
+    bmtl->>someip: setAudioZone(<params>)
+    someip->>manager: setAudioZone(<params>)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.setData(Data data[AUDIO_ZONE, <params>])
+    app->>app: Process AUDIO_ZONE request
+    note left of app: App updates AUDIO_ZONE using setData() API
+```
+{{< /diagram >}}
+
+## Set Headrest Audio by BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED
+note over bmtl, app: This action is possible from BMT only when VOICE_CALL exists
+    bmtl->>someip: setHeadrestAudio(<params>)
+    someip->>manager: setHeadrestAudio(<params>)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.setData(Data data[HEADREST_AUDIO, <params>])
+    app->>app: Process HEADREST_AUDIO request
+    note left of app: App updates HEADREST_AUDIO using setData() API
+```
+{{< /diagram >}}
+
+## Set SCO Status by BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED
+note over bmtl, app: This action is possible from BMT only when VOICE_CALL exists
+    bmtl->>someip: setScoStatus(<params>)
+    someip->>manager: setScoStatus(<params>)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.setData(Data data[SCO_STATUS, <params>])
+    app->>app: Process SCO_STATUS request
+    note left of app: App updates SCO_STATUS using setData() API
+```
+{{< /diagram >}}
+
+## Dial from BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: service status is ENABLED
+    bmtl->>someip: dial(<params>)
+    someip->>manager: dial(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[DIAL, <params>], ActionCallback actionCallback)
+    app->>app: Process DIAL request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note left of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtl: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtl: TelephonyError::NOT_SUPPORTED
+    end
+note over bmtl, app: If the DIAL request is successful, App sends the VOICE_CALL with the updated params.
+```
+{{< /diagram >}}
+
+## Answer from BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Android
+        participant app as Phone App
+        participant manager as TelephonyManager +<br/> BMWTelephonyService +<br/> BMWTelephonyManager HAL
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+    end
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+note over bmtr, app: Service status is ENABLED
+    app->>manager: setData(dataList[VOICE_CALL, <params>], dataSetCallback)
+    manager->>someip: setVOICE_CALL(<params>)
+    par
+        someip->>bmtl: VOICE_CALL[<params>]
+    and
+        someip->>bmtr: VOICE_CALL[<params>]
+    end
+    alt
+        bmtr->>someip: answer(<params>)
+    else
+        bmtl->>someip: answer(<params>)
+    end
+    someip->>manager: answer(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[ANSWER, <params>], ActionCallback actionCallback)
+    app->>app: Process ANSWER request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note right of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtr: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtr: TelephonyError::NOT_SUPPORTED
+    end
+note over bmtr, app: If the ANSWER request is successful, App sends the VOICE_CALL with the updated params
+```
+{{< /diagram >}}
+
+## Hangup from BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED, voice call is in active state
+    alt
+        bmtl->>someip: hangup(<params>)
+    else
+        bmtr->>someip: hangup(<params>)
+    end
+    someip->>manager: hangup(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[HANGUP, <params>], ActionCallback actionCallback)
+    app->>app: Process HANGUP request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note left of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtl: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtl: TelephonyError::NOT_SUPPORTED
+    end
+note over bmtl, app: If the HANGUP request is successful, App sends the VOICE_CALL with the updated params
+```
+{{< /diagram >}}
+
+## Hold from BMT
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED, voice call is in active state
+    alt
+        bmtl->>someip: hold(<params>)
+    else
+        bmtr->>someip: hold(<params>)
+    end
+    someip->>manager: hold(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[HOLD, <params>], ActionCallback actionCallback)
+    app->>app: Process HOLD request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note left of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtl: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtl: TelephonyError::NOT_SUPPORTED
+    end
+note over bmtl, app: If the HOLD request is successful, App sends the VOICE_CALL with the updated params
+```
+{{< /diagram >}}
+
+## Resume from BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED, voice call is on hold
+    alt
+        bmtl->>someip: resume(<params>)
+    else
+        bmtr->>someip: resume(<params>)
+    end
+    someip->>manager: resume(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[RESUME, <params>], ActionCallback actionCallback)
+    app->>app: Process RESUME request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note left of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtl: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtl: TelephonyError::NOT_SUPPORTED
+    end
+note over bmtl, app: If the RESUME request is successful, App sends the VOICE_CALL with the updated params
+```
+{{< /diagram >}}
+
+## Swap Calls from BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED, one voice call is active, second voice call is on hold
+    alt
+        bmtl->>someip: swapCalls(<params>)
+    else
+        bmtr->>someip: swapCalls(<params>)
+    end
+    someip->>manager: swapCalls(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[SWAP_CALLS, <params>], ActionCallback actionCallback)
+    app->>app: Process SWAP_CALLS request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note left of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtl: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtl: TelephonyError::NOT_SUPPORTED
+    end
+note over bmtl, app:  If the SWARP_CALLS request is successful, App sends the VOICE_CALL with the updated params for both voice calls
+```
+{{< /diagram >}}
+
+## Send Tone from BMT
+
+{{< diagram >}}
+```mermaid
+sequenceDiagram
+    box Other ECUs
+        participant bmtl as BMT Left
+        participant bmtr as BMT Right
+    end
+    box Android
+        participant someip as TelephonyManager<br/>SOME/IP service provider
+        participant manager as TelephonyManager HAL +<br/> BMWTelephonyService +<br/> BMWTelephonyManager
+        participant app as Phone App
+    end
+note over bmtl, app: Service status is ENABLED, voice call is in active state
+    alt
+        bmtl->>someip: swapCalls(<params>)
+    else
+        bmtr->>someip: swapCalls(<params>)
+    end
+    someip->>manager: swapCalls(<params>, resultCallback)
+    break BMWTelephonyCallback is not set
+        manager->>someip: resultCallback(TelephonyError::FAILED)
+        someip-->>bmtl: TelephonyError::FAILED
+    end
+    manager->>app: callback.action(Action action[SEND_TONE, <params>], ActionCallback actionCallback)
+    app->>app: Process SEND_TONE request
+    alt
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::OK])
+        manager->>someip: resultCallback(TelephonyError::OK)
+        someip->>bmtl: TelephonyError::OK
+        note left of app: App updates parameters using setData() API
+    else wrong <params> provided
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::INVALID_ARGUMENT])
+        manager->>someip: resultCallback(TelephonyError::INVALID_ARGUMENT)
+        someip->>bmtl: TelephonyError::INVALID_ARGUMENT
+    else not supported by device
+        app->>manager: actionCallback.setResult(ActionResult actionResult[TelephonyError::NOT_SUPPORTED])
+        manager->>someip: resultCallback(TelephonyError::NOT_SUPPORTED)
+        someip->>bmtl: TelephonyError::NOT_SUPPORTED
+    end
+```
+{{< /diagram >}}
