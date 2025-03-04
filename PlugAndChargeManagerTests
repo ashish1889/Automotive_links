@@ -1,0 +1,1861 @@
+package java.com.bmwgroup.apinext.plugandcharge.manager;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.*;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.doAnswer;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.Parcelable;
+import android.os.RemoteException;
+import android.os.UserHandle;
+
+import androidx.test.runner.AndroidJUnit4;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.runner.RunWith;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
+import java.util.*;
+
+import vendor.bmw.plugandcharge.callbacks.IPlugAndChargeCallback;
+import vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener;
+import vendor.bmw.plugandcharge.callbacks.ICallStatusCallback;
+import vendor.bmw.plugandcharge.payload.ActiveEmaId;
+import vendor.bmw.plugandcharge.payload.ContractCertificateDeletionResult;
+import vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult;
+import vendor.bmw.plugandcharge.payload.ContractCertificates;
+import vendor.bmw.plugandcharge.payload.PncActivationState;
+import vendor.bmw.plugandcharge.payload.RootCertificates;
+import vendor.bmw.plugandcharge.requests.GetValueRequest;
+import vendor.bmw.plugandcharge.requests.ManageCertificatesRequest;
+import vendor.bmw.plugandcharge.types.CallStatus;
+import vendor.bmw.plugandcharge.types.ContractCertificate;
+import vendor.bmw.plugandcharge.types.RootCertificate;
+
+import com.bmwgroup.apinext.plugandcharge.manager.ConnectionFailedException;
+import com.bmwgroup.apinext.plugandcharge.manager.RootCertificateData;
+import com.bmwgroup.apinext.plugandcharge.manager.SelectionStatus;
+import com.bmwgroup.apinext.plugandcharge.manager.ServiceNotReadyException;
+import com.bmwgroup.apinext.plugandcharge.manager.SlotNumber;
+import com.bmwgroup.apinext.plugandcharge.manager.ContractCertificateData;
+import com.bmwgroup.apinext.plugandcharge.manager.AuthenticationResult;
+import com.bmwgroup.apinext.plugandcharge.manager.InstallationContractCertificateResult;
+import com.bmwgroup.apinext.plugandcharge.manager.InstallationRootCertificateResult;
+import com.bmwgroup.apinext.plugandcharge.manager.DeletionContractCertificateResult;
+import com.bmwgroup.apinext.plugandcharge.manager.DeletionRootCertificateResult;
+import com.bmwgroup.apinext.plugandcharge.manager.PlugAndChargeManager;
+import com.bmwgroup.apinext.plugandcharge.manager.Listener;
+import com.bmwgroup.apinext.plugandcharge.manager.IActiveEmaIdCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IRootCertificateCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IContractCertificateCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IAuthenticationResultCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IInstallationContractCertificateResultCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IInstallationRootCertificateResultCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IDeletionContractCertificateResultCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IDeletionRootCertificateResultCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.IPncActivationStateCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.CallStatusCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.CertificateType;
+import com.bmwgroup.apinext.plugandcharge.manager.CertificateValidity;
+import com.bmwgroup.apinext.plugandcharge.manager.StatusCode;
+import com.bmwgroup.apinext.plugandcharge.manager.callbackWrappers.AvailabilityListenerWrapper;
+import com.bmwgroup.apinext.plugandcharge.manager.callbackWrappers.CallStatusCallbackWrapper;
+import com.bmwgroup.apinext.plugandcharge.manager.callbackWrappers.PlugAndChargeCallbackWrapper;
+import com.bmwgroup.apinext.plugandcharge.manager.callbacks.GetValueCallback;
+import com.bmwgroup.apinext.plugandcharge.manager.callbacks.PlugAndChargeListener;
+import com.bmwgroup.apinext.plugandcharge.manager.callbacks.PlugAndChargeServiceConnection;
+import com.bmwgroup.apinext.plugandcharge.manager.legacySupport.LegacyMapper;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.CertificateRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.DeleteAllContractCertificatesRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.DeleteAllRootCertificatesRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.DeleteContractCertificateRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.DeleteRootCertificateRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.InstallContractCertificateWithEmaIdRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.InstallRootCertificateWithFingerprintRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.SelectContractCertificateRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.SetContractCertificateVisibilityRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.SetContractNameRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.SetPncActivationStateRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.requests.UpdateContractCertificateWithEmaIdRequest;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.ActiveEmaIdResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.AuthenticationResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.ContractCertificatesResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.DeletionContractCertificateResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.DeletionRootCertificateResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.InstallationContractCertificateResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.InstallationResultRootCertificateResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.PlugAndChargeData;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.PncActivationStateResponse;
+import com.bmwgroup.apinext.plugandcharge.manager.responses.RootCertificatesResponse;
+
+/**
+ * Instrumented test, which will execute on an Android device.
+ *
+ * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ */
+@RunWith(AndroidJUnit4.class)
+public class PlugAndChargeManagerTests {
+
+  @Rule
+  public ExpectedException expectedEx = ExpectedException.none();
+
+  private PlugAndChargeManager mPlugAndChargeManager;
+  private vendor.bmw.plugandcharge.IPlugAndCharge mService;
+  private Context mContext;
+  private AvailabilityListenerWrapper mAvailabilityListener;
+
+  @Before
+  public void setup() throws Exception {
+    mService = mock(vendor.bmw.plugandcharge.IPlugAndCharge.class);
+    mContext = mock(Context.class);
+    mAvailabilityListener = mock(AvailabilityListenerWrapper.class);
+    // Setup fake config data for testing
+    mPlugAndChargeManager = new PlugAndChargeManager(mService, true);
+    mPlugAndChargeManager.setConnectionStatus(true);
+  }
+
+  private List<vendor.bmw.plugandcharge.types.RootCertificate> getDummyRootCertficate() {
+    List<vendor.bmw.plugandcharge.types.RootCertificate> resultList = new ArrayList<>();
+    vendor.bmw.plugandcharge.types.RootCertificate data = new vendor.bmw.plugandcharge.types.RootCertificate();
+    for (int i = 0; i < 5; i++) {
+      data.fingerprint = "name" + i;
+      data.errorCounter = 0;
+      data.remainingValidityDays = 2;
+      data.slotNumber = SlotNumber.STORAGE_SLOT_8.ordinal();
+      data.selectionStatus = SelectionStatus.SELECTED.ordinal();
+      data.type = CertificateType.V2G_ROOT_CERTIFICATE.ordinal();
+      data.validity = CertificateValidity.VALID.ordinal();
+      resultList.add(data);
+    }
+    return resultList;
+  }
+
+  private List<vendor.bmw.plugandcharge.types.ContractCertificate> getDummyContractCertficate() {
+    List<vendor.bmw.plugandcharge.types.ContractCertificate> resultList = new ArrayList<>();
+    vendor.bmw.plugandcharge.types.ContractCertificate data = new vendor.bmw.plugandcharge.types.ContractCertificate();
+    for (int i = 0; i < 5; i++) {
+      data.emaId = "ss@" + i;
+      data.contractName = "name" + i;
+      data.visibleForSecondaryUsers = true;
+      data.errorCounter = 0;
+      data.slotNumber = SlotNumber.STORAGE_SLOT_8.ordinal();
+      data.selectionStatus = SelectionStatus.SELECTED.ordinal();
+      data.type = CertificateType.CONTRACT_CERTIFICATE.ordinal();
+      data.validity = CertificateValidity.VALID.ordinal();
+      resultList.add(data);
+    }
+    return resultList;
+  }
+
+  @Test
+  public void testGetInstance() throws Exception {
+    PlugAndChargeManager plugAndChargeManager = PlugAndChargeManager.getInstance();
+    assertNotNull(plugAndChargeManager);
+  }
+
+
+
+  @Test
+  public void testRegisterListener_whenServiceIsBound_withValidArgs() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+    verify(mService, times(1)).registerEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+  }
+
+  @Test
+  public void testRegisterListener_whenServiceIsBound_withSameListenerMultipleTime() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // adding same listener multiple times
+    Listener listener1 = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener1);
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertNotEquals(2, mPlugAndChargeManager.getEventSize(listener1));
+  }
+
+  @Test
+  public void testRegisterListener_whenServiceIsBound_listenerIsNull() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager : Provided Listener is null");
+    Listener listener = null;
+    mPlugAndChargeManager.registerListener(listener);
+    verify(mService, times(0)).registerEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testRegisterListener_whenServiceIsBound_listenerIsInvalid() throws Exception {
+    expectedEx.expect(IllegalArgumentException.class);
+    expectedEx.expectMessage("PlugAndChargeManager: Listener type is not valid");
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    Listener listener = new Listener(callback);
+    mPlugAndChargeManager.registerListener(listener);
+    verify(mService, times(0)).registerEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testUnregisterListener_whenServiceIsBound_listenerIsNull() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager: Provided Listener is null");
+    Listener listener = null;
+    mPlugAndChargeManager.unregisterListener(listener);
+    verify(mService, times(0)).unregisterEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testUnregisterListener_whenServiceIsBound_listenerIsInvalid() throws Exception {
+    expectedEx.expect(IllegalArgumentException.class);
+    expectedEx.expectMessage("PlugAndChargeManager: Listener type is not valid");
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    Listener listener = new Listener(callback);
+    mPlugAndChargeManager.unregisterListener(listener);
+    verify(mService, times(0)).unregisterEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testUnregisterListener_whenServiceIsBound_withSameListenerMultipleTime() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // adding same listener multiple times
+    Listener listener1 = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener1);
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertNotEquals(2, mPlugAndChargeManager.getEventSize(listener1));
+
+
+    mPlugAndChargeManager.unregisterListener(listener);
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener1));
+
+    mPlugAndChargeManager.unregisterListener(listener1);
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener1));
+  }
+
+  @Test
+  public void testUnregisterListener_whenServiceIsBound_withValidArgs() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+    verify(mService, times(1)).registerEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    mPlugAndChargeManager.unregisterListener(listener);
+    verify(mService, times(1)).unregisterEventListener(eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+  }
+
+  @Test
+  public void testGetPncActivationState_whenServiceIsBound() throws Exception {
+    boolean state = true;
+    PncActivationState mockParcel = new PncActivationState();
+    mockParcel.state = state;
+    mockGetValueAsync(mockParcel);
+    boolean result = mPlugAndChargeManager.getPncActivationState();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(state, result);
+  }
+
+  @Test
+  public void testGetPncActivationStateAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IPncActivationStateCallback callback = null;
+    mPlugAndChargeManager.getPncActivationStateAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetPncActivationStateAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IPncActivationStateCallback callback = mock(IPncActivationStateCallback.class);
+    mPlugAndChargeManager.getPncActivationStateAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetActiveEmaId_whenServiceIsBound() throws Exception {
+    String emaId = "emaId";
+    ActiveEmaId mockParcel = new ActiveEmaId();
+    mockParcel.emaId = emaId;
+    mockGetValueAsync(mockParcel);
+    String result = mPlugAndChargeManager.getActiveEmaId();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(emaId, result);
+  }
+
+  @Test
+  public void testGetActiveEmaIdAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IActiveEmaIdCallback callback = null;
+    mPlugAndChargeManager.getActiveEmaIdAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetActiveEmaIdAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IActiveEmaIdCallback callback = mock(IActiveEmaIdCallback.class);
+    mPlugAndChargeManager.getActiveEmaIdAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetRootCertificateList_whenServiceIsBound() throws Exception {
+    List<vendor.bmw.plugandcharge.types.RootCertificate> list = getDummyRootCertficate();
+    RootCertificates mockParcel = new RootCertificates();
+    mockParcel.rootCertificates = list;
+    mockGetValueAsync(mockParcel);
+    List<RootCertificateData> result = mPlugAndChargeManager.getRootCertificates();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(list.size(), result.size());
+  }
+
+  @Test
+  public void testGetRootCertificateListAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IRootCertificateCallback callback = null;
+    mPlugAndChargeManager.getRootCertificatesAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetRootCertificateListAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IRootCertificateCallback callback = mock(IRootCertificateCallback.class);
+    mPlugAndChargeManager.getRootCertificatesAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetContractCertificateList_whenServiceIsBound() throws Exception {
+    List<vendor.bmw.plugandcharge.types.ContractCertificate> list = getDummyContractCertficate();
+    ContractCertificates mockParcel = new ContractCertificates();
+    mockParcel.contractCertificates = list;
+    mockGetValueAsync(mockParcel);
+    List<ContractCertificateData> result = mPlugAndChargeManager.getContractCertificates();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(list.size(), result.size());
+  }
+
+  @Test
+  public void testGetContractCertificateListAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IContractCertificateCallback callback = null;
+    mPlugAndChargeManager.getContractCertificatesAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetContractCertificateListAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IContractCertificateCallback callback = mock(IContractCertificateCallback.class);
+    mPlugAndChargeManager.getContractCertificatesAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetAuthenticationResult_whenServiceIsBound() throws Exception {
+    vendor.bmw.plugandcharge.payload.AuthenticationResult data = new vendor.bmw.plugandcharge.payload.AuthenticationResult();
+    data.authenticationStatus = 1;
+    data.slotId = 1;
+    data.emaId = "emaId";
+    mockGetValueAsync(data);
+    AuthenticationResult result = mPlugAndChargeManager.getAuthenticationResult();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(data.authenticationStatus, result.getAuthenticationStatus().ordinal());
+    assertEquals(data.slotId, result.getSlotId());
+    assertEquals(data.emaId, result.getEmaId());
+  }
+
+  @Test
+  public void testGetAuthenticationResultAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IAuthenticationResultCallback callback = null;
+    mPlugAndChargeManager.getAuthenticationResultAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetAuthenticationResultAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IAuthenticationResultCallback callback = mock(IAuthenticationResultCallback.class);
+    mPlugAndChargeManager.getAuthenticationResultAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetInstallationContractCertificateResult_whenServiceIsBound() throws Exception {
+    ContractCertificateInstallationResult.InstallationResult data = new ContractCertificateInstallationResult.InstallationResult();
+    data.installationStatus = 1;
+    data.slotId = 1;
+    data.emaId = "emaId";
+    vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult mockParcel = new vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult();
+    mockParcel.installationResults = Arrays.asList(data);
+    mockGetValueAsync(mockParcel);
+    InstallationContractCertificateResult result = mPlugAndChargeManager.getInstallationContractCertificateResult();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(data.installationStatus, result.getInstallationStatus().ordinal());
+    assertEquals(data.slotId, result.getSlotId());
+    assertEquals(data.emaId, result.getEmaId());
+  }
+
+  @Test
+  public void testGetInstallationContractCertificateResultAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IInstallationContractCertificateResultCallback callback = null;
+    mPlugAndChargeManager.getInstallationContractCertificateResultAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetInstallationContractCertificateResultAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IInstallationContractCertificateResultCallback callback = mock(
+        IInstallationContractCertificateResultCallback.class);
+        mPlugAndChargeManager.getInstallationContractCertificateResultAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetInstallationRootCertificateResult_whenServiceIsBound() throws Exception {
+    vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult data = new vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult();
+    data.installationStatus = 1;
+    data.slotId = 1;
+    data.fingerprint = "fingerprint";
+    mockGetValueAsync(data);
+    InstallationRootCertificateResult result = mPlugAndChargeManager.getInstallationRootCertificateResult();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(data.installationStatus, result.getInstallationStatus().ordinal());
+    assertEquals(data.slotId, result.getSlotId());
+    assertEquals(data.fingerprint, result.getFingerprint());
+  }
+
+  @Test
+  public void testGetInstallationRootCertificateResultAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IInstallationRootCertificateResultCallback callback = null;
+    mPlugAndChargeManager.getInstallationRootCertificateResultAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetInstallationRootCertificateResultAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IInstallationRootCertificateResultCallback callback = mock(IInstallationRootCertificateResultCallback.class);
+    mPlugAndChargeManager.getInstallationRootCertificateResultAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetDeletionContractCertificateResult_whenServiceIsBound() throws Exception {
+    ContractCertificateDeletionResult.DeletionResult data = new ContractCertificateDeletionResult.DeletionResult();
+    data.deletionStatus = 1;
+    data.emaId = "emaId";
+    ContractCertificateDeletionResult mockParcel = new ContractCertificateDeletionResult();
+    mockParcel.deletionResults = Arrays.asList(data);
+    mockGetValueAsync(mockParcel);
+    DeletionContractCertificateResult result = mPlugAndChargeManager.getDeletionContractCertificateResult();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(data.deletionStatus, result.getDeletionStatus().ordinal());
+    assertEquals(data.emaId, result.getEmaId());
+  }
+
+  @Test
+  public void testGetDeletionContractCertificateResultAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IDeletionContractCertificateResultCallback callback = null;
+    mPlugAndChargeManager.getDeletionContractCertificateResultAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetDeletionContractCertificateResultAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IDeletionContractCertificateResultCallback callback = mock(IDeletionContractCertificateResultCallback.class);
+    mPlugAndChargeManager.getDeletionContractCertificateResultAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetDeletionRootCertificateResult_whenServiceIsBound() throws Exception {
+    vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult data = new vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult();
+    data.deletionStatus = 1;
+    data.fingerprint = "fingerprint";
+    mockGetValueAsync(data);
+    DeletionRootCertificateResult result = mPlugAndChargeManager.getDeletionRootCertificateResult();
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+    assertEquals(data.deletionStatus, result.getDeletionStatus().ordinal());
+    assertEquals(data.fingerprint, result.getFingerprint());
+  }
+
+  @Test
+  public void testGetDeletionRootCertificateResultAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+    IDeletionRootCertificateResultCallback callback = null;
+    mPlugAndChargeManager.getDeletionRootCertificateResultAsync(callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testGetDeletionRootCertificateResultAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IDeletionRootCertificateResultCallback callback = mock(IDeletionRootCertificateResultCallback.class);
+    mPlugAndChargeManager.getDeletionRootCertificateResultAsync(callback);
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testDeleteContractCertificate_whenServiceIsBound_withInvalidArgs() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = null;
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteContractCertificate(emaId, callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testDeleteContractCertificate_whenServiceIsBound_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = "";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteContractCertificate(emaId, callback);
+    verify(mService, times(0)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void testDeleteContractCertificate_whenServiceIsBound_withValidArgs() throws Exception {
+    String emaId = "emaId";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteContractCertificate(emaId, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testDeleteAllContractCertificate_whenServiceIsBound_withNullcallback() throws Exception {
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.deleteAllContractCertificates(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any());
+  }
+
+  @Test
+  public void testDeleteAllContractCertificate_whenServiceIsBound_withValidCallback() throws Exception {
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteAllContractCertificates(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSelectContractCertificate_whenServiceIsBound_withInvalidValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = null;
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.selectContractCertificate(emaId, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any());
+  }
+
+  @Test
+  public void testSelectContractCertificate_whenServiceIsBound_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = "";
+    CallStatusCallback callback = mock(CallStatusCallback.class);;
+    mPlugAndChargeManager.selectContractCertificate(emaId, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSelectContractCertificate_whenServiceIsBound_withValidValue() throws Exception {
+    String emaId = "emaId";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.selectContractCertificate(emaId, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testInstallContractCertificateViaPlc_whenServiceIsBound_withNullCallback() throws Exception {
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.installContractCertificateViaPlc(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any());
+  }
+
+  @Test
+  public void testInstallContractCertificateViaEmaId_withInvalidValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId or contractName is null");
+    String emaId = null;
+    String contractName = null;
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.installContractCertificateWithEmaId(emaId, contractName, true, true, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testInstallContractCertificateViaEmaId_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId or contractName is null");
+    String emaId = "";
+    String contractName = "";
+    CallStatusCallback callback = mock(CallStatusCallback.class);;
+    mPlugAndChargeManager.installContractCertificateWithEmaId(emaId, contractName, true, true, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testInstallContractCertificateViaEmaId_withValidValue() throws Exception {
+    String emaId = "emaId";
+    String contractName = "contractName";
+    CallStatusCallback callback = mock(CallStatusCallback.class);;
+    mPlugAndChargeManager.installContractCertificateWithEmaId(emaId, contractName, true, true, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testUpdateContractCertificate_withNullEmaId() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = null;
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.updateContractCertificateWithEmaId(emaId, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testUpdateContractCertificate_withEmptyEmaId() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = "";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.updateContractCertificateWithEmaId(emaId, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testUpdateContractCertificate_withValidEmaId() throws Exception {
+    String emaId = "emaId";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.updateContractCertificateWithEmaId(emaId, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSetContractName_withNullValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = null;
+    String contractname = null;
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.setContractName(emaId, contractname, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSetContractName_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = "";
+    String contractname = "";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.setContractName(emaId, contractname, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSetContractName_withValidValue() throws Exception {
+    String emaId = "emaId";
+    String contractname = "contractname";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.setContractName(emaId, contractname, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testDeleteRootCertificate_withNullValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided fingerprint is null");
+    String fingerprint = null;
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.deleteRootCertificate(fingerprint, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testDeleteRootCertificate_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided fingerprint is null");
+    String fingerprint = "";
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.deleteRootCertificate(fingerprint, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testDeleteRootCertificate_withValidValue() throws Exception {
+    String fingerprint = "fingerprint";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteRootCertificate(fingerprint, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testDeleteAllRootCertificate_withNullCallback() throws Exception {
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.deleteAllRootCertificates(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any());
+  }
+
+  @Test
+  public void testDeleteAllRootCertificate_withValidCallback() throws Exception {
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteAllRootCertificates(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testStartPairingMode_withNullCallback() throws Exception {
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.startPairingMode(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any());
+  }
+
+  @Test
+  public void testStartPairingMode_withValidCallback() throws Exception {
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.startPairingMode(callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testInstallRootCertificateWithFingerprint_withInvalidValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided fingerprint is null");
+    String fingerprint = null;
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.installRootCertificateWithFingerprint(fingerprint, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testInstallRootCertificateWithFingerprint_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided fingerprint is null");
+    String fingerprint = "";
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.installRootCertificateWithFingerprint(fingerprint, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testInstallRootCertificateWithFingerprint_withValidValue() throws Exception {
+    String fingerprint = "fingerprint";
+    CallStatusCallback callback =  mock(CallStatusCallback.class);
+    mPlugAndChargeManager.installRootCertificateWithFingerprint(fingerprint, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSetPncActivationState_withInvalidcallback() throws Exception {
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.setPncActivationState(true, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any());
+  }
+
+
+  @Test
+  public void testSetPncActivationState_withValidcallback() throws Exception {
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.setPncActivationState(true, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+
+  @Test
+  public void testSetContractCertificateVisibility_withInvalidValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = null;
+    CallStatusCallback callback = null;
+    mPlugAndChargeManager.setContractCertificateVisibility(true, emaId, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSetContractCertificateVisibility_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+    String emaId = "";
+    CallStatusCallback callback =  mock(CallStatusCallback.class);
+    mPlugAndChargeManager.setContractCertificateVisibility(true, emaId, callback);
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testSetContractCertificateVisibility_withValidValue() throws Exception {
+    String emaId = "emaId";
+    CallStatusCallback callback =  mock(CallStatusCallback.class);
+    mPlugAndChargeManager.setContractCertificateVisibility(true, emaId, callback);
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testBind_whenServiceBound() throws Exception {
+    final PlugAndChargeManager.PlugandChargeServiceConnection connection =
+        mock(PlugAndChargeManager.PlugandChargeServiceConnection.class);
+
+    boolean status = mPlugAndChargeManager.bind(mContext, connection);
+    assertTrue(status);
+  }
+
+  @Test
+  public void testBind_whenServiceNotBound() throws Exception {
+    final PlugAndChargeManager.PlugandChargeServiceConnection connection =
+        mock(PlugAndChargeManager.PlugandChargeServiceConnection.class);
+
+    final Intent intent = new Intent();
+    intent.setComponent(PlugAndChargeManager.PLUG_AND_CHARGE_SERVICE_COMPONENT);
+    when(mContext.bindServiceAsUser(any(Intent.class), any(ServiceConnection.class),
+        any(Integer.class), any(UserHandle.class))).thenReturn(true);
+    boolean status = mPlugAndChargeManager.bind(mContext, connection);
+    assertTrue(status);
+  }
+
+  @Test
+  public void testUnbind_whenServiceBound() throws Exception {
+    mPlugAndChargeManager.unbind(mContext);
+    assertEquals(mPlugAndChargeManager.isBound(), false);
+  }
+
+  @Test
+  public void testGetPncActivationState_whenConnectionFalse() throws Exception {
+    expectedEx.expect(ServiceNotReadyException.class);
+    expectedEx.expectMessage("Connect/bind to the service first before making any request!");
+    mPlugAndChargeManager.setConnectionStatus(false);
+    mPlugAndChargeManager.getPncActivationState();
+    verify(mService, times(0)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+  }
+
+  private void mockGetValueAsync(Parcelable parcel) throws RemoteException {
+    doAnswer(invocationOnMock -> {
+      GetValueRequest request = invocationOnMock.getArgument(0);
+      PlugAndChargeCallbackWrapper plugAndChargeCallback = invocationOnMock.getArgument(1);
+
+      vendor.bmw.plugandcharge.PlugAndChargeData plugAndChargeData = new vendor.bmw.plugandcharge.PlugAndChargeData();
+      plugAndChargeData.type = request.type;
+      plugAndChargeData.payload.setParcelable(parcel);
+
+      plugAndChargeCallback.onGetValue(request.requestId, StatusCode.CallStatus.SUCCESS, plugAndChargeData);
+      return null;
+    }).when(mService).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_bind_with_newPlugAndChargeServiceConnection_when_contextIsNull() throws Exception {
+    // given
+    Context context = null;
+    mPlugAndChargeManager.setConnectionStatus(false);
+
+    // when
+    Exception exception = assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.bind(context, (service, status) -> {}));
+
+    // then
+    assertEquals("bind() either context or connectionListener is null", exception.getMessage());
+  }
+
+  @Test
+  public void verify_bind_with_newPlugAndChargeServiceConnection_when_callbackIsNull() throws Exception {
+    // given
+    mPlugAndChargeManager.setConnectionStatus(false);
+    PlugAndChargeServiceConnection plugAndChargeServiceConnection = null;
+
+    // when
+    Exception exception = assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.bind(mContext, plugAndChargeServiceConnection));
+
+    // then
+    assertEquals("bind() either context or connectionListener is null", exception.getMessage());
+  }
+
+  @Test
+  public void verify_bind_with_newPlugAndChargeServiceConnection_when_serviceIsAlreadyConnected() throws Exception {
+    // given
+    mPlugAndChargeManager.setConnectionStatus(true);
+
+    // when
+    boolean isBound = mPlugAndChargeManager.bind(mContext, (service, status) -> {});
+
+    // then
+    assertTrue(isBound);
+    verify(mContext, times(0)).bindServiceAsUser(any(Intent.class), any(ServiceConnection.class), anyInt(), any(UserHandle.class));
+  }
+
+  @Test
+  public void verify_bind_with_newPlugAndChargeServiceConnection_when_serviceIsNotConnected() throws Exception {
+    // given
+    when(mContext.bindServiceAsUser(any(Intent.class), any(ServiceConnection.class), any(Integer.class), any(UserHandle.class))).thenReturn(true);
+    mPlugAndChargeManager.setConnectionStatus(false);
+
+    // when
+    boolean isBound = mPlugAndChargeManager.bind(mContext, (service, status) -> {});
+
+    // then
+    assertTrue(isBound);
+    verify(mContext, times(1)).bindServiceAsUser(any(Intent.class), any(ServiceConnection.class), anyInt(), any(UserHandle.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_when_callBackIsNull() throws Exception {
+    // given
+    mPlugAndChargeManager.setConnectionStatus(false);
+    GetValueCallback getValueCallback = null;
+
+    // when
+    Exception exception = assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.PNC_ACTIVATION_STATE, getValueCallback));
+
+    // then
+    assertEquals("getValuesAsync() callStatusCallback is null", exception.getMessage());
+  }
+
+  @Test
+  public void verify_getValueAsync_when_plugAndChargeDataTypeIsInvalid() throws Exception {
+    // given
+    List<Integer> invalidPlugAndChargeDataTypeSet = Arrays.asList(-999, -1, PlugAndChargeData.Type.UNKNOWN, 400, 900);
+
+    invalidPlugAndChargeDataTypeSet.forEach( invalidPlugAndChargeDataType -> {
+      // when
+      Exception exception = assertThrows(IllegalArgumentException.class, () -> mPlugAndChargeManager.getValueAsync(invalidPlugAndChargeDataType, (requestId, callStatus, value) -> {}));
+
+      // then
+      assertEquals("PlugAndChargeData Type is UNKNOWN!", exception.getMessage());
+    });
+  }
+
+  @Test
+  public void verify_getValueAsync_when_serviceIsNotBound() throws Exception {
+    // given
+    mPlugAndChargeManager.setConnectionStatus(false);
+
+    // when
+    Exception exception = assertThrows(ServiceNotReadyException.class, () -> mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.PNC_ACTIVATION_STATE, (requestId, callStatus, value) -> {}));
+
+    // then
+    assertTrue(exception.getMessage().contains("Connect/bind to the service first before making any request!"));
+  }
+
+  @Test
+  public void verify_getValueAsync_when_haComponentIsNotAvailable() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(false);
+
+    // when
+    Exception exception = assertThrows(ConnectionFailedException.class, () -> mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.PNC_ACTIVATION_STATE, (requestId, callStatus, value) -> {}));
+
+    // then
+    assertTrue(exception.getMessage().contains("Hal component not available"));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_LIST() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    List<vendor.bmw.plugandcharge.types.ContractCertificate> list = getDummyContractCertficate();
+    ContractCertificates mockParcel = new ContractCertificates();
+    mockParcel.contractCertificates = list;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof ContractCertificatesResponse);
+      assertEquals(list.size(), ((ContractCertificatesResponse) value).getContractCertificates().size());
+      for (int i = 0; i < list.size(); i++) {
+        ContractCertificate expectedContractCertificateData = list.get(i);
+        ContractCertificateData actualContractCertificateData = ((ContractCertificatesResponse) value).getContractCertificates().get(i);
+
+        assertEquals(expectedContractCertificateData.emaId, actualContractCertificateData.getEmaId());
+        assertEquals(expectedContractCertificateData.contractName, actualContractCertificateData.getContractName());
+        assertEquals(expectedContractCertificateData.visibleForSecondaryUsers, actualContractCertificateData.isVisibleForSecondaryUsers());
+        assertEquals(expectedContractCertificateData.errorCounter, actualContractCertificateData.getErrorCounter());
+        assertEquals(expectedContractCertificateData.slotNumber, actualContractCertificateData.getSlotNumber().ordinal());
+        assertEquals(expectedContractCertificateData.selectionStatus, actualContractCertificateData.getSelectionStatus().ordinal());
+        assertEquals(expectedContractCertificateData.type, actualContractCertificateData.getType().ordinal());
+        assertEquals(expectedContractCertificateData.validity, actualContractCertificateData.getValidity().ordinal());
+      }
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_INSTALLATION_STATUS() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    ContractCertificateInstallationResult.InstallationResult data = new ContractCertificateInstallationResult.InstallationResult();
+    data.installationStatus = 1;
+    data.slotId = 1;
+    data.emaId = "emaId";
+    vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult mockParcel = new vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult();
+    mockParcel.installationResults = Arrays.asList(data);
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_INSTALLATION_STATUS, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof InstallationContractCertificateResponse);
+      InstallationContractCertificateResult actualData = ((InstallationContractCertificateResponse) value).getInstallationContractCertificates().get(0);
+      assertEquals(data.installationStatus, actualData.getInstallationStatus().ordinal());
+      assertEquals(data.slotId, actualData.getSlotId());
+      assertEquals(data.emaId, actualData.getEmaId());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_DELETION_STATUS() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    ContractCertificateDeletionResult.DeletionResult data = new ContractCertificateDeletionResult.DeletionResult();
+    data.deletionStatus = 1;
+    data.emaId = "emaId";
+    ContractCertificateDeletionResult mockParcel = new ContractCertificateDeletionResult();
+    mockParcel.deletionResults = Arrays.asList(data);
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_DELETION_STATUS, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof DeletionContractCertificateResponse);
+
+      assertEquals(data.deletionStatus, ((DeletionContractCertificateResponse) value).getDeletionContractCertificates().get(0).getDeletionStatus().ordinal());
+      assertEquals(data.emaId, ((DeletionContractCertificateResponse) value).getDeletionContractCertificates().get(0).getEmaId());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ROOT_CERTIFICATE_LIST() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    List<vendor.bmw.plugandcharge.types.RootCertificate> list = getDummyRootCertficate();
+    RootCertificates mockParcel = new RootCertificates();
+    mockParcel.rootCertificates = list;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.ROOT_CERTIFICATE_LIST, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof RootCertificatesResponse);
+      assertEquals(list.size(), ((RootCertificatesResponse) value).getRootCertificates().size());
+      for (int i = 0; i < list.size(); i++) {
+        RootCertificate expectedRootCertificate = list.get(i);
+        RootCertificateData actualRootCertificateData = ((RootCertificatesResponse) value).getRootCertificates().get(i);
+
+        assertEquals(expectedRootCertificate.fingerprint, actualRootCertificateData.getFingerprint());
+        assertEquals(expectedRootCertificate.errorCounter, actualRootCertificateData.getErrorCounter());
+        assertEquals(expectedRootCertificate.remainingValidityDays, actualRootCertificateData.getRemainingValidityDays());
+        assertEquals(expectedRootCertificate.slotNumber, actualRootCertificateData.getSlotNumber().ordinal());
+        assertEquals(expectedRootCertificate.selectionStatus, actualRootCertificateData.getSelectionStatus().ordinal());
+        assertEquals(expectedRootCertificate.type, actualRootCertificateData.getType().ordinal());
+        assertEquals(expectedRootCertificate.validity, actualRootCertificateData.getValidity().ordinal());
+      }
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ROOT_CERTIFICATE_INSTALLATION_STATUS() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult data = new vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult();
+    data.installationStatus = 1;
+    data.slotId = 1;
+    data.fingerprint = "fingerprint";
+    mockGetValueAsync(data);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.ROOT_CERTIFICATE_INSTALLATION_STATUS, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof InstallationResultRootCertificateResponse);
+
+      assertEquals(data.installationStatus, ((InstallationResultRootCertificateResponse) value).getInstallationResultRootCertificate().getInstallationStatus().ordinal());
+      assertEquals(data.slotId, ((InstallationResultRootCertificateResponse) value).getInstallationResultRootCertificate().getSlotId());
+      assertEquals(data.fingerprint, ((InstallationResultRootCertificateResponse) value).getInstallationResultRootCertificate().getFingerprint());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ROOT_CERTIFICATE_DELETION_STATUS() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult data = new vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult();
+    data.deletionStatus = 1;
+    data.fingerprint = "fingerprint";
+    mockGetValueAsync(data);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.ROOT_CERTIFICATE_DELETION_STATUS, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof DeletionRootCertificateResponse);
+      assertEquals(data.deletionStatus, ((DeletionRootCertificateResponse) value).getDeletionRootCertificate().getDeletionStatus().ordinal());
+      assertEquals(data.fingerprint, ((DeletionRootCertificateResponse) value).getDeletionRootCertificate().getFingerprint());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_PNC_ACTIVATION_STATE() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    PncActivationState mockParcel = new PncActivationState();
+    mockParcel.state = true;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.PNC_ACTIVATION_STATE, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof PncActivationStateResponse);
+      assertEquals(mockParcel.state, ((PncActivationStateResponse) value).getState());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_AUTHENTICATION_RESULT() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    vendor.bmw.plugandcharge.payload.AuthenticationResult data = new vendor.bmw.plugandcharge.payload.AuthenticationResult();
+    data.authenticationStatus = 1;
+    data.slotId = 1;
+    data.emaId = "emaId";
+    mockGetValueAsync(data);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.AUTHENTICATION_RESULT, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof AuthenticationResponse);
+      assertEquals(data.authenticationStatus, ((AuthenticationResponse) value).getAuthenticationStatus().ordinal());
+      assertEquals(data.slotId, ((AuthenticationResponse) value).getSlotId());
+      assertEquals(data.emaId, ((AuthenticationResponse) value).getEmaId());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ACTIVE_EMA_ID() throws Exception {
+    // given
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE)).thenReturn(true);
+
+    String emaId = "emaId";
+    ActiveEmaId mockParcel = new ActiveEmaId();
+    mockParcel.emaId = emaId;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.ACTIVE_EMA_ID, (requestId, callStatus, value) -> {
+
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+      assertTrue(value instanceof ActiveEmaIdResponse);
+      assertEquals(mockParcel.emaId, ((ActiveEmaIdResponse) value).getEmaId());
+    });
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_requestIsNull() throws Exception {
+    // given
+    CertificateRequest certificateRequest = null;
+
+    // when
+    Exception exception = assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+
+    // then
+    assertEquals("manageCertificate() request is null", exception.getMessage());
+  }
+
+  @Test
+  public void verify_manageCertificate_when_CertificatesRequestIsInvalid() throws Exception {
+    // given
+    CertificateRequest certificateRequest = new CertificateRequest(CertificateRequest.Type.UNKNOWN);
+
+    // then
+    assertThrows(IllegalArgumentException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteAllContractCertificatesRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new DeleteAllContractCertificatesRequest(null),
+            new DeleteAllContractCertificatesRequest("")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteAllRootCertificatesRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new DeleteAllRootCertificatesRequest(null),
+            new DeleteAllRootCertificatesRequest("")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteContractCertificateRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new DeleteContractCertificateRequest(null, null),
+            new DeleteContractCertificateRequest("", null),
+            new DeleteContractCertificateRequest("emaID", null),
+            new DeleteContractCertificateRequest(null, ""),
+            new DeleteContractCertificateRequest("", ""),
+            new DeleteContractCertificateRequest("emaID", ""),
+            new DeleteContractCertificateRequest(null, "correlationID"),
+            new DeleteContractCertificateRequest("", "correlationID")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteRootCertificateRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new DeleteRootCertificateRequest(null, null),
+            new DeleteRootCertificateRequest("", null),
+            new DeleteRootCertificateRequest("fingerprint", null),
+            new DeleteRootCertificateRequest(null, ""),
+            new DeleteRootCertificateRequest("", ""),
+            new DeleteRootCertificateRequest("fingerprint", ""),
+            new DeleteRootCertificateRequest(null, "correlationID"),
+            new DeleteRootCertificateRequest("", "correlationID")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_InstallContractCertificateWithEmaIdRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new InstallContractCertificateWithEmaIdRequest(null, null, false, false, null),
+            new InstallContractCertificateWithEmaIdRequest("", null, false, false, null),
+            new InstallContractCertificateWithEmaIdRequest("emaID", null, false, false, null),
+            new InstallContractCertificateWithEmaIdRequest(null, "", false, false, null),
+            new InstallContractCertificateWithEmaIdRequest("", "", false, false, null),
+            new InstallContractCertificateWithEmaIdRequest("emaID", "", false, false, null),
+            new InstallContractCertificateWithEmaIdRequest(null, "contractName", false, false, null),
+            new InstallContractCertificateWithEmaIdRequest("", "contractName", false, false, null),
+            new InstallContractCertificateWithEmaIdRequest("emaID", "contractName", false, false, null),
+            new InstallContractCertificateWithEmaIdRequest(null, null, false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest("", null, false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest("emaID", null, false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest(null, "", false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest("", "", false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest("emaID", "", false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest(null, "contractName", false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest("", "contractName", false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest("emaID", "contractName", false, false, ""),
+            new InstallContractCertificateWithEmaIdRequest(null, null, false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest("", null, false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest("emaID", null, false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest(null, "", false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest("", "", false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest("emaID", "", false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest(null, "contractName", false, false, "correlationID"),
+            new InstallContractCertificateWithEmaIdRequest("", "contractName", false, false, "correlationID")
+    );
+
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_InstallRootCertificateWithFingerprintRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new InstallRootCertificateWithFingerprintRequest(null, null),
+            new InstallRootCertificateWithFingerprintRequest("", null),
+            new InstallRootCertificateWithFingerprintRequest("fingerprint", null),
+            new InstallRootCertificateWithFingerprintRequest(null, ""),
+            new InstallRootCertificateWithFingerprintRequest("", ""),
+            new InstallRootCertificateWithFingerprintRequest("fingerprint", ""),
+            new InstallRootCertificateWithFingerprintRequest(null, "correlationID"),
+            new InstallRootCertificateWithFingerprintRequest("", "correlationID")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SelectContractCertificateRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new SelectContractCertificateRequest(null, null),
+            new SelectContractCertificateRequest("", null),
+            new SelectContractCertificateRequest("emaID", null),
+            new SelectContractCertificateRequest(null, ""),
+            new SelectContractCertificateRequest("", ""),
+            new SelectContractCertificateRequest("emaID", ""),
+            new SelectContractCertificateRequest(null, "correlationID"),
+            new SelectContractCertificateRequest("", "correlationID")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SetContractCertificateVisibilityRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new SetContractCertificateVisibilityRequest(false, null),
+            new SetContractCertificateVisibilityRequest(false, "")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SetContractNameRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new SetContractNameRequest(null, null),
+            new SetContractNameRequest("", null),
+            new SetContractNameRequest("emaID", null),
+            new SetContractNameRequest(null, ""),
+            new SetContractNameRequest("", ""),
+            new SetContractNameRequest("emaID", ""),
+            new SetContractNameRequest(null, "contractName"),
+            new SetContractNameRequest("", "contractName")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SetPncActivationStateRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new SetPncActivationStateRequest(false, null),
+            new SetPncActivationStateRequest(false, "")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+  }
+
+  @Test
+  public void verify_manageCertificate_when_UpdateContractCertificateWithEmaIdRequestIsInvalid() throws Exception {
+    // given
+    List<CertificateRequest> certificateRequests = Arrays.asList(
+            new UpdateContractCertificateWithEmaIdRequest(null, null),
+            new UpdateContractCertificateWithEmaIdRequest("", null),
+            new UpdateContractCertificateWithEmaIdRequest("emaID", null),
+            new UpdateContractCertificateWithEmaIdRequest(null, ""),
+            new UpdateContractCertificateWithEmaIdRequest("", ""),
+            new UpdateContractCertificateWithEmaIdRequest("emaID", ""),
+            new UpdateContractCertificateWithEmaIdRequest(null, "correlationID"),
+            new UpdateContractCertificateWithEmaIdRequest("", "correlationID")
+    );
+
+    // then
+    certificateRequests.forEach(certificateRequest -> {
+      assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.manageCertificate(certificateRequest, null));
+    });
+
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteAllContractCertificatesRequestIsValid() throws Exception {
+    // given
+    DeleteAllContractCertificatesRequest certificateRequest = new DeleteAllContractCertificatesRequest("correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteAllRootCertificatesRequestIsValid() throws Exception {
+    // given
+    DeleteAllRootCertificatesRequest certificateRequest = new DeleteAllRootCertificatesRequest("correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteContractCertificateRequestIsValid() throws Exception {
+    // given
+    DeleteContractCertificateRequest certificateRequest = new DeleteContractCertificateRequest("emaID", "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_DeleteRootCertificateRequestIsValid() throws Exception {
+    // given
+    DeleteRootCertificateRequest certificateRequest = new DeleteRootCertificateRequest("fingerprint", "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_InstallContractCertificateWithEmaIdRequestIsValid() throws Exception {
+    // given
+    InstallContractCertificateWithEmaIdRequest certificateRequest = new InstallContractCertificateWithEmaIdRequest("emaID", "contractName", false, false, "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_InstallRootCertificateWithFingerprintRequestIsValid() throws Exception {
+    // given
+    InstallRootCertificateWithFingerprintRequest certificateRequest = new InstallRootCertificateWithFingerprintRequest("fingerprint", "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SelectContractCertificateRequestIsValid() throws Exception {
+    // given
+    SelectContractCertificateRequest certificateRequest = new SelectContractCertificateRequest("emaID", "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SetContractCertificateVisibilityRequestIsValid() throws Exception {
+    // given
+    SetContractCertificateVisibilityRequest certificateRequest = new SetContractCertificateVisibilityRequest(false, "emaID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SetContractNameRequestIsValid() throws Exception {
+    // given
+    SetContractNameRequest certificateRequest = new SetContractNameRequest("emaID", "contractName");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_SetPncActivationStateRequestIsValid() throws Exception {
+    // given
+    SetPncActivationStateRequest certificateRequest = new SetPncActivationStateRequest(false, "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate_when_UpdateContractCertificateWithEmaIdRequestIsValid() throws Exception {
+    // given
+    UpdateContractCertificateWithEmaIdRequest certificateRequest = new UpdateContractCertificateWithEmaIdRequest("emaID", "correlationID");
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeManager.manageCertificate(certificateRequest, status -> {
+      // then
+      assertEquals(StatusCode.CallStatus.SUCCESS, status);
+    });
+    verify(mService, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  private void mockManageCertificateCallBack() throws RemoteException {
+    doAnswer(invocationOnMock -> {
+      CallStatusCallbackWrapper callStatusCallbackWrapper = invocationOnMock.getArgument(1);
+      if (callStatusCallbackWrapper != null) {
+        callStatusCallbackWrapper.onCallStatus(CallStatus.SUCCESS);
+      }
+      return null;
+    }).when(mService).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  @Test
+  public void verify_registerEventListener_when_listenerIsNull() throws Exception {
+    // given
+    PlugAndChargeListener listener = null;
+
+    // when
+    Exception exception = assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.registerEventListener(PlugAndChargeData.Type.PNC_ACTIVATION_STATE, listener, status -> {}));
+
+    // then
+    assertEquals("registerEventListener() listener is null", exception.getMessage());
+  }
+
+  @Test
+  public void verify_registerEventListener_when_dataTypeIsInvalid() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.UNKNOWN;
+
+    // when
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> mPlugAndChargeManager.registerEventListener(dataType, value -> {}, status -> {}));
+
+    // then
+    assertEquals("PlugAndChargeData Type is UNKNOWN!", exception.getMessage());
+  }
+
+  @Test
+  public void verify_registerEventListener_when_dataTypeIsValid() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST;
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+
+    // then
+    verify(mService, times(1)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+  @Test
+  public void verify_registerEventListener_when_sameDataTypeIsRegisteredMultipleTimesWithSameListener() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST;
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+
+    // then
+    verify(mService, times(2)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+
+  @Test
+  public void verify_registerEventListener_when_distinctDataTypeIsRegisteredWithSameListener() throws Exception {
+    // given
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(PlugAndChargeData.Type.ACTIVE_EMA_ID, listener, status -> {});
+
+    // then
+    verify(mService, times(2)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(2, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+  @Test
+  public void verify_registerEventListener_when_sameDataTypeIsRegisteredWithDistinctListener() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST;
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // given
+    PlugAndChargeListener listener1 = value -> {};
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener1, status -> {});
+
+    // then
+    verify(mService, times(2)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(2, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener1));
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+  @Test
+  public void verify_registerEventListener_when_distinctDataTypeIsRegisteredWithDistinctListener() throws Exception {
+    // given
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // given
+    PlugAndChargeListener listener1 = value -> {};
+
+    // when
+    mPlugAndChargeManager.registerEventListener(PlugAndChargeData.Type.ACTIVE_EMA_ID, listener1, status -> {});
+
+    // then
+    verify(mService, times(2)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(2, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener1));
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+  @Test
+  public void verify_unregisterEventListener_when_listenerIsNull() throws Exception {
+    // given
+    PlugAndChargeListener listener = null;
+
+    // when
+    Exception exception = assertThrows(NullPointerException.class, () -> mPlugAndChargeManager.unregisterEventListener(PlugAndChargeData.Type.PNC_ACTIVATION_STATE, listener, status -> {}));
+
+    // then
+    assertEquals("unregisterEventListener() listener is null", exception.getMessage());
+  }
+
+  @Test
+  public void verify_unregisterEventListener_when_dataTypeIsInvalid() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.UNKNOWN;
+
+    // when
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> mPlugAndChargeManager.unregisterEventListener(dataType, value -> {}, status -> {}));
+
+    // then
+    assertEquals("PlugAndChargeData Type is UNKNOWN!", exception.getMessage());
+  }
+
+  @Test
+  public void verify_unregisterEventListener() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST;
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.unregisterEventListener(dataType, listener, status -> {});
+
+    // then
+    verify(mService, times(1)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    verify(mService, times(1)).unregisterEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+  @Test
+  public void verify_unregisterEventListener_partialUnregister() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST;
+    int dataType1 = PlugAndChargeData.Type.ACTIVE_EMA_ID;
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+    mPlugAndChargeManager.registerEventListener(dataType1, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(2, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.unregisterEventListener(dataType, listener, status -> {});
+
+    // then
+    verify(mService, times(2)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    verify(mService, times(1)).unregisterEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(1, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+
+  @Test
+  public void verify_unregisterEventListener_fullyUnregister() throws Exception {
+    // given
+    int dataType = PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST;
+    int dataType1 = PlugAndChargeData.Type.ACTIVE_EMA_ID;
+    PlugAndChargeListener listener = value -> {};
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.registerEventListener(dataType, listener, status -> {});
+    mPlugAndChargeManager.registerEventListener(dataType1, listener, status -> {});
+
+    // then
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(2, mPlugAndChargeManager.getEventSize(listener));
+
+    // when
+    mPlugAndChargeManager.unregisterEventListener(dataType, listener, status -> {});
+    mPlugAndChargeManager.unregisterEventListener(dataType1, listener, status -> {});
+
+    // then
+    verify(mService, times(2)).registerEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    verify(mService, times(2)).unregisterEventListener(anyInt(), any(vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+    assertEquals(0, mPlugAndChargeManager.getEventSize(listener));
+  }
+
+}
