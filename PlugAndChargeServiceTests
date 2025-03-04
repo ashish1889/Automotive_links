@@ -1,0 +1,742 @@
+package com.bmwgroup.apinext.plugandcharge.service;
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+import java.util.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.mockito.MockitoSession;
+import org.mockito.junit.MockitoJUnit;
+
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.Parcelable;
+import android.os.RemoteException;
+import android.util.AndroidRuntimeException;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.rule.ServiceTestRule;
+
+import com.bmwgroup.apinext.plugandcharge.service.PlugAndChargeService;
+
+import org.junit.rules.ExpectedException;
+
+import java.lang.*;
+import java.util.*;
+
+import vendor.bmw.plugandcharge.PlugAndChargeData;
+import vendor.bmw.plugandcharge.PlugAndChargeType;
+import vendor.bmw.plugandcharge.callbacks.IPlugAndChargeCallback;
+import vendor.bmw.plugandcharge.callbacks.IPlugAndChargeListener;
+import vendor.bmw.plugandcharge.callbacks.ICallStatusCallback;
+import vendor.bmw.plugandcharge.payload.ActiveEmaId;
+import vendor.bmw.plugandcharge.payload.ContractCertificateDeletionResult;
+import vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult;
+import vendor.bmw.plugandcharge.payload.ContractCertificates;
+import vendor.bmw.plugandcharge.payload.PncActivationState;
+import vendor.bmw.plugandcharge.payload.RootCertificates;
+import vendor.bmw.plugandcharge.requests.GetValueRequest;
+import vendor.bmw.plugandcharge.requests.ManageCertificatesRequest;
+import vendor.bmw.plugandcharge.types.CallStatus;
+import vendor.bmw.plugandcharge.types.ContractCertificate;
+import vendor.bmw.plugandcharge.types.RootCertificate;
+
+/**
+ * Instrumented test, which will execute on an Android device.
+ *
+ * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ */
+@RunWith(AndroidJUnit4.class)
+public class PlugAndChargeServiceTest {
+
+  @Rule
+  public ExpectedException expectedEx = ExpectedException.none();
+  public final ServiceTestRule mPlugAndChargeServiceRule = new ServiceTestRule();
+  private vendor.bmw.plugandcharge.IPlugAndCharge mIPlugAndChargeHal;
+  private PlugAndChargeService mPlugAndChargeService;
+  private vendor.bmw.plugandcharge.IPlugAndCharge mPlugAndChargeServiceImpl;
+
+  @Before
+  public void setup() throws Exception {
+    MockitoAnnotations.initMocks(this);
+
+    mIPlugAndChargeHal = mock(vendor.bmw.plugandcharge.IPlugAndCharge.Stub.class);
+
+    assertNotNull(mIPlugAndChargeHal);
+
+    mPlugAndChargeService = new PlugAndChargeService(mIPlugAndChargeHal);
+    assertNotNull(mPlugAndChargeService);
+
+    Intent serviceIntent = new Intent();
+    serviceIntent.setClassName(
+            "com.bmwgroup.apinext.plugandcharge.service",
+            "com.bmwgroup.apinext.plugandcharge.service.PlugAndChargeService");
+
+    // Setup fake root certificate data for testing
+    RootCertificates mockParcel = new RootCertificates();
+    mockParcel.rootCertificates = getDummyRootCertficate();
+    mockGetValueAsync(vendor.bmw.plugandcharge.PlugAndChargeType.ROOT_CERTIFICATE_LIST, mockParcel);
+
+    // Setup fake contract certificate data for testing
+    ContractCertificates mockParcel1 = new ContractCertificates();
+    mockParcel1.contractCertificates = getDummyContractCertficate();
+    mockGetValueAsync(vendor.bmw.plugandcharge.PlugAndChargeType.CONTRACT_CERTIFICATE_LIST, mockParcel1);
+
+    mPlugAndChargeServiceImpl = (vendor.bmw.plugandcharge.IPlugAndCharge.Stub) mPlugAndChargeService.onBind(serviceIntent);
+    assertNotNull(mPlugAndChargeServiceImpl);
+  }
+
+  private void mockGetValueAsync(int plugAndChargeDataType, Parcelable parcel) throws RemoteException {
+    doAnswer(invocationOnMock -> {
+      GetValueRequest request = invocationOnMock.getArgument(0);
+      IPlugAndChargeCallback plugAndChargeCallback = invocationOnMock.getArgument(1);
+
+      if (plugAndChargeDataType == request.type) {
+        vendor.bmw.plugandcharge.PlugAndChargeData plugAndChargeData = new vendor.bmw.plugandcharge.PlugAndChargeData();
+        plugAndChargeData.type = request.type;
+        plugAndChargeData.payload.setParcelable(parcel);
+        plugAndChargeCallback.onGetValue(request.requestId, 1, plugAndChargeData);
+      }
+
+      return null;
+    }).when(mIPlugAndChargeHal).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  private void mockGetValueAsync(Parcelable parcel) throws RemoteException {
+    doAnswer(invocationOnMock -> {
+      GetValueRequest request = invocationOnMock.getArgument(0);
+      IPlugAndChargeCallback plugAndChargeCallback = invocationOnMock.getArgument(1);
+
+      vendor.bmw.plugandcharge.PlugAndChargeData plugAndChargeData = new vendor.bmw.plugandcharge.PlugAndChargeData();
+      plugAndChargeData.type = request.type;
+      plugAndChargeData.payload.setParcelable(parcel);
+      plugAndChargeCallback.onGetValue(request.requestId, CallStatus.SUCCESS, plugAndChargeData);
+
+      return null;
+    }).when(mIPlugAndChargeHal).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    Intent serviceIntent = new Intent();
+    serviceIntent.setClassName(
+            "com.bmwgroup.apinext.plugandcharge.service",
+            "com.bmwgroup.apinext.plugandcharge.service.PlugAndChargeService");
+    mPlugAndChargeService.onUnbind(serviceIntent);
+
+    IBinder binder = mock(IBinder.class);
+    when(mIPlugAndChargeHal.asBinder()).thenReturn(binder);
+    doReturn(true).when(binder).unlinkToDeath(
+            any(IBinder.DeathRecipient.class), anyInt());
+
+    mPlugAndChargeService.onDestroy();
+    mIPlugAndChargeHal = null;
+    mPlugAndChargeService = null;
+    mPlugAndChargeServiceImpl = null;
+  }
+
+  private List<RootCertificate> getDummyRootCertficate() {
+    List<RootCertificate> resultList = new ArrayList<>();
+    RootCertificate data = new RootCertificate();
+    for (int i = 0; i < 5; i++) {
+      data.fingerprint = "name" + i;
+      data.errorCounter = 0;
+      data.remainingValidityDays = 2;
+      data.slotNumber = 1069;
+      data.selectionStatus = 1;
+      data.type = 1;
+      data.validity = 30;
+      resultList.add(data);
+    }
+    return resultList;
+  }
+
+  private List<ContractCertificate> getDummyContractCertficate() {
+    List<ContractCertificate> resultList = new ArrayList<>();
+    ContractCertificate data = new ContractCertificate();
+    for (int i = 0; i < 5; i++) {
+      data.emaId = "ss@" + i;
+      data.contractName = "name" + i;
+      data.visibleForSecondaryUsers = true;
+      data.errorCounter = 0;
+      data.slotNumber = 1069;
+      data.selectionStatus = 1;
+      data.type = 0;
+      data.validity = 30;
+      resultList.add(data);
+    }
+    return resultList;
+  }
+
+  @Test
+  public void testRegisterEventListener_whenListenerNull() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("registerEventListener() listener is null");
+    int event = 1;
+    IPlugAndChargeListener listener = null;
+    vendor.bmw.plugandcharge.callbacks.ICallStatusCallback callStatusCallback = null;
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, callStatusCallback);
+    verify(mIPlugAndChargeHal, times(0))
+            .registerEventListener(eq(event), any(IPlugAndChargeListener.class), any(ICallStatusCallback.class));
+  }
+
+  @Test
+  public void testRegisterListListener_forFirstClient() throws Exception {
+    int event = 1;
+    IPlugAndChargeListener listener = mock(IPlugAndChargeListener.class);
+    IBinder binder = mock(IBinder.class);
+    when(listener.asBinder()).thenReturn(binder);
+
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .registerEventListener(eq(event), any(IPlugAndChargeListener.class), any());
+    assertTrue(mPlugAndChargeService.containListener(listener));
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+    assertTrue(mPlugAndChargeService.containEvent(listener, event));
+  }
+
+  @Test
+  public void testRegisterListListener_forRegisteredClientWithUpdatedEvent()
+          throws Exception {
+    int event = 1;
+    IPlugAndChargeListener listener = mock(IPlugAndChargeListener.class);
+    IBinder binder = mock(IBinder.class);
+    when(listener.asBinder()).thenReturn(binder);
+
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+    // Register First Client with event
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, null);
+    assertEquals(1, mPlugAndChargeService.getSubscribedEventSize(listener));
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+    // Register again same Client with updated event
+    int eventNew = 2;
+    mPlugAndChargeServiceImpl.registerEventListener(eventNew, listener, null);
+    assertEquals(2, mPlugAndChargeService.getSubscribedEventSize(listener));
+    assertTrue(mPlugAndChargeService.containEvent(listener, event));
+    assertTrue(mPlugAndChargeService.containEvent(listener, eventNew));
+  }
+
+  @Test
+  public void testRegisterListListener_forRegisteredClientWithSameEventMultipleTimes()
+          throws Exception {
+    int event = 1;
+    IPlugAndChargeListener listener = mock(IPlugAndChargeListener.class);
+    IBinder binder = mock(IBinder.class);
+    when(listener.asBinder()).thenReturn(binder);
+
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+    // Register First Client with event
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, null);
+    assertEquals(1, mPlugAndChargeService.getSubscribedEventSize(listener));
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+    // Register again same Client with same event
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, null);
+    assertEquals(1, mPlugAndChargeService.getSubscribedEventSize(listener));
+    assertTrue(mPlugAndChargeService.containEvent(listener, event));
+  }
+
+  @Test
+  public void testRegisterListListener_forRegisteredClientWithSameEventMultipleListener()
+          throws Exception {
+    int event = 1;
+    IPlugAndChargeListener listener1 = mock(IPlugAndChargeListener.class);
+    IBinder binder = mock(IBinder.class);
+    when(listener1.asBinder()).thenReturn(binder);
+
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+    // Register First Client with event
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener1, null);
+    assertEquals(1, mPlugAndChargeService.getSubscribedEventSize(listener1));
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+
+    IPlugAndChargeListener listener2 = mock(IPlugAndChargeListener.class);
+    IBinder binder2 = mock(IBinder.class);
+    when(listener2.asBinder()).thenReturn(binder2);
+    // Register differnt Client with same event
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener2, null);
+    assertEquals(1, mPlugAndChargeService.getSubscribedEventSize(listener2));
+    assertTrue(mPlugAndChargeService.containEvent(listener1, event));
+    assertTrue(mPlugAndChargeService.containEvent(listener2, event));
+    assertEquals(2, mPlugAndChargeService.getClientMapSize());
+  }
+
+  @Test
+  public void testUnregisterListListener_whenListenerNull() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("unregisterEventListener() listener is null");
+    int event = 1;
+    IPlugAndChargeListener listener = null;
+    mPlugAndChargeServiceImpl.unregisterEventListener(event, listener, null);
+    verify(mIPlugAndChargeHal, times(0))
+            .unregisterEventListener(eq(event), any(IPlugAndChargeListener.class), any());
+  }
+
+  @Test
+  public void testUnregisterListListener_forFirstClientWithSameEvent()
+          throws Exception {
+    int event = 1;
+    IPlugAndChargeListener listener = mock(IPlugAndChargeListener.class);
+    IBinder binder = mock(IBinder.class);
+    when(listener.asBinder()).thenReturn(binder);
+
+    // Test for Register
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .registerEventListener(eq(event), any(IPlugAndChargeListener.class), any());
+    assertTrue(mPlugAndChargeService.containListener(listener));
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+
+    // Test for Unregister the same Client with same event which are
+    // subscribed
+    mPlugAndChargeServiceImpl.unregisterEventListener(event, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .unregisterEventListener(eq(event), any(IPlugAndChargeListener.class), any());
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+  }
+
+  @Test
+  public void testUnregisterListListener_forSameListenerMultipleEvents()
+          throws Exception {
+    int event = 1;
+    IPlugAndChargeListener listener = mock(IPlugAndChargeListener.class);
+    IBinder binder = mock(IBinder.class);
+    when(listener.asBinder()).thenReturn(binder);
+
+    // Test for Register
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+    mPlugAndChargeServiceImpl.registerEventListener(event, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .registerEventListener(eq(event), any(IPlugAndChargeListener.class), any());
+    assertTrue(mPlugAndChargeService.containListener(listener));
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+
+    int eventNew = 2;
+    mPlugAndChargeServiceImpl.registerEventListener(eventNew, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .registerEventListener(eq(eventNew), any(IPlugAndChargeListener.class), any());
+    assertEquals(2, mPlugAndChargeService.getSubscribedEventSize(listener));
+    // Test for Unregister the same Client with same event which are
+    // subscribed
+    mPlugAndChargeServiceImpl.unregisterEventListener(event, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .unregisterEventListener(eq(event), any(IPlugAndChargeListener.class), any());
+    assertEquals(1, mPlugAndChargeService.getClientMapSize());
+
+    mPlugAndChargeServiceImpl.unregisterEventListener(eventNew, listener, null);
+    verify(mIPlugAndChargeHal, times(1))
+            .unregisterEventListener(eq(eventNew), any(IPlugAndChargeListener.class), any());
+    assertEquals(0, mPlugAndChargeService.getClientMapSize());
+  }
+
+  @Test
+  public void testGetPncActivationState() throws Exception {
+    boolean state = true;
+    PncActivationState mockParcel = new PncActivationState();
+    mockParcel.state = state;
+    mockGetValueAsync(PlugAndChargeType.PNC_ACTIVATION_STATE, mockParcel);
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        assertEquals(state, data.payload.getParcelable(PncActivationState.class).state);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1))
+            .getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_LIST() throws Exception {
+    // given
+    List<vendor.bmw.plugandcharge.types.ContractCertificate> list = getDummyContractCertficate();
+    ContractCertificates mockParcel = new ContractCertificates();
+    mockParcel.contractCertificates = list;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        assertEquals(list.size(), data.payload.getParcelable(ContractCertificates.class).contractCertificates.size());
+        for (int i = 0; i < list.size(); i++) {
+          ContractCertificate expectedContractCertificateData = list.get(i);
+          ContractCertificate actualContractCertificateData = data.payload.getParcelable(ContractCertificates.class).contractCertificates.get(i);
+
+          assertEquals(expectedContractCertificateData.emaId, actualContractCertificateData.emaId);
+          assertEquals(expectedContractCertificateData.contractName, actualContractCertificateData.contractName);
+          assertEquals(expectedContractCertificateData.visibleForSecondaryUsers, actualContractCertificateData.visibleForSecondaryUsers);
+          assertEquals(expectedContractCertificateData.errorCounter, actualContractCertificateData.errorCounter);
+          assertEquals(expectedContractCertificateData.slotNumber, actualContractCertificateData.slotNumber);
+          assertEquals(expectedContractCertificateData.selectionStatus, actualContractCertificateData.selectionStatus);
+          assertEquals(expectedContractCertificateData.type, actualContractCertificateData.type);
+          assertEquals(expectedContractCertificateData.validity, actualContractCertificateData.validity);
+        }
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+
+  @Test
+  public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_INSTALLATION_STATUS() throws Exception {
+    // given
+    ContractCertificateInstallationResult.InstallationResult mockData = new ContractCertificateInstallationResult.InstallationResult();
+    mockData.installationStatus = 1;
+    mockData.slotId = 1;
+    mockData.emaId = "emaId";
+    vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult mockParcel = new vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult();
+    mockParcel.installationResults = Arrays.asList(mockData);
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        ContractCertificateInstallationResult.InstallationResult actualData = data.payload.getParcelable(ContractCertificateInstallationResult.class).installationResults.get(0);
+        assertEquals(mockData.installationStatus, actualData.installationStatus);
+        assertEquals(mockData.slotId, actualData.slotId);
+        assertEquals(mockData.emaId, actualData.emaId);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_DELETION_STATUS() throws Exception {
+    // given
+    ContractCertificateDeletionResult.DeletionResult mockData = new ContractCertificateDeletionResult.DeletionResult();
+    mockData.deletionStatus = 1;
+    mockData.emaId = "emaId";
+    ContractCertificateDeletionResult mockParcel = new ContractCertificateDeletionResult();
+    mockParcel.deletionResults = Arrays.asList(mockData);
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        ContractCertificateDeletionResult.DeletionResult actualData = data.payload.getParcelable(ContractCertificateDeletionResult.class).deletionResults.get(0);
+        assertEquals(mockData.deletionStatus, actualData.deletionStatus);
+        assertEquals(mockData.emaId, actualData.emaId);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ROOT_CERTIFICATE_LIST() throws Exception {
+    // given
+    List<vendor.bmw.plugandcharge.types.RootCertificate> list = getDummyRootCertficate();
+    RootCertificates mockParcel = new RootCertificates();
+    mockParcel.rootCertificates = list;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        assertEquals(list.size(), data.payload.getParcelable(RootCertificates.class).rootCertificates.size());
+        for (int i = 0; i < list.size(); i++) {
+          RootCertificate expectedRootCertificate = list.get(i);
+          vendor.bmw.plugandcharge.types.RootCertificate actualRootCertificateData = data.payload.getParcelable(RootCertificates.class).rootCertificates.get(i);
+
+          assertEquals(expectedRootCertificate.fingerprint, actualRootCertificateData.fingerprint);
+          assertEquals(expectedRootCertificate.errorCounter, actualRootCertificateData.errorCounter);
+          assertEquals(expectedRootCertificate.remainingValidityDays, actualRootCertificateData.remainingValidityDays);
+          assertEquals(expectedRootCertificate.slotNumber, actualRootCertificateData.slotNumber);
+          assertEquals(expectedRootCertificate.selectionStatus, actualRootCertificateData.selectionStatus);
+          assertEquals(expectedRootCertificate.type, actualRootCertificateData.type);
+          assertEquals(expectedRootCertificate.validity, actualRootCertificateData.validity);
+        }
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ROOT_CERTIFICATE_INSTALLATION_STATUS() throws Exception {
+    // given
+    vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult mockData = new vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult();
+    mockData.installationStatus = 1;
+    mockData.slotId = 1;
+    mockData.fingerprint = "fingerprint";
+    mockGetValueAsync(mockData);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult actualData = data.payload.getParcelable(vendor.bmw.plugandcharge.payload.RootCertificateInstallationResult.class);
+        assertEquals(mockData.installationStatus, actualData.installationStatus);
+        assertEquals(mockData.slotId, actualData.slotId);
+        assertEquals(mockData.fingerprint, actualData.fingerprint);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ROOT_CERTIFICATE_DELETION_STATUS() throws Exception {
+    // given
+    vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult mockData = new vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult();
+    mockData.deletionStatus = 1;
+    mockData.fingerprint = "fingerprint";
+    mockGetValueAsync(mockData);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult actualData = data.payload.getParcelable(vendor.bmw.plugandcharge.payload.RootCertificateDeletionResult.class);
+        assertEquals(mockData.deletionStatus, actualData.deletionStatus);
+        assertEquals(mockData.fingerprint, actualData.fingerprint);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_PNC_ACTIVATION_STATE() throws Exception {
+    // given
+    PncActivationState mockParcel = new PncActivationState();
+    mockParcel.state = true;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        assertEquals(mockParcel.state, data.payload.getParcelable(PncActivationState.class).state);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_AUTHENTICATION_RESULT() throws Exception {
+    // given
+    vendor.bmw.plugandcharge.payload.AuthenticationResult mockData = new vendor.bmw.plugandcharge.payload.AuthenticationResult();
+    mockData.authenticationStatus = 1;
+    mockData.slotId = 1;
+    mockData.emaId = "emaId";
+    mockGetValueAsync(mockData);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        vendor.bmw.plugandcharge.payload.AuthenticationResult actualData = data.payload.getParcelable(vendor.bmw.plugandcharge.payload.AuthenticationResult.class);
+        assertEquals(mockData.authenticationStatus, actualData.authenticationStatus);
+        assertEquals(mockData.slotId, actualData.slotId);
+        assertEquals(mockData.emaId, actualData.emaId);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_getValueAsync_for_ACTIVE_EMA_ID() throws Exception {
+    // given
+    String emaId = "emaId";
+    ActiveEmaId mockParcel = new ActiveEmaId();
+    mockParcel.emaId = emaId;
+    mockGetValueAsync(mockParcel);
+
+    // when
+    mPlugAndChargeServiceImpl.getValueAsync(new GetValueRequest(), new IPlugAndChargeCallback.Stub() {
+
+      @Override
+      public void onGetValue(int requestId, int callStatus, PlugAndChargeData data) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+        assertNotNull(data.payload);
+        assertEquals(mockParcel.emaId, data.payload.getParcelable(ActiveEmaId.class).emaId);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+  }
+
+  @Test
+  public void verify_manageCertificate() throws Exception {
+    // given
+    vendor.bmw.plugandcharge.requests.ManageCertificatesRequest certificateRequest = new vendor.bmw.plugandcharge.requests.ManageCertificatesRequest();
+    mockManageCertificateCallBack();
+
+    // when
+    mPlugAndChargeServiceImpl.manageCertificate(certificateRequest, new ICallStatusCallback.Stub() {
+      @Override
+      public void onCallStatus(int callStatus) throws RemoteException {
+        // then
+        assertEquals(CallStatus.SUCCESS, callStatus);
+      }
+
+      @Override
+      public int getInterfaceVersion() throws RemoteException {
+        return 0;
+      }
+
+      @Override
+      public String getInterfaceHash() throws RemoteException {
+        return null;
+      }
+    });
+    verify(mIPlugAndChargeHal, times(1)).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+
+  private void mockManageCertificateCallBack() throws RemoteException {
+    doAnswer(invocationOnMock -> {
+      vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.Stub callStatusCallbackWrapper = invocationOnMock.getArgument(1);
+      if (callStatusCallbackWrapper != null) {
+        callStatusCallbackWrapper.onCallStatus(CallStatus.SUCCESS);
+      }
+      return null;
+    }).when(mIPlugAndChargeHal).manageCertificate(any(vendor.bmw.plugandcharge.requests.ManageCertificatesRequest.class), any(vendor.bmw.plugandcharge.callbacks.ICallStatusCallback.class));
+  }
+}
