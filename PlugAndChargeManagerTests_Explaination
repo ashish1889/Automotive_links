@@ -1,0 +1,532 @@
+This file, PlugAndChargeManagerTests.java, contains unit tests for the PlugAndChargeManager class in a BMW Plug and Charge system.
+It is structured as an instrumented test suite using JUnit4 and Mockito for mocking dependencies. Here’s a breakdown of what the code does:
+
+1. Imports and Dependencies
+The file imports:
+
+JUnit4 and ExpectedException for testing.
+Mockito for mocking dependencies.
+Android-specific classes such as Context, Intent, ServiceConnection, etc.
+Vendor-specific classes from vendor.bmw.plugandcharge, which appear to define the Plug and Charge API.
+BMW API-specific classes from com.bmwgroup.apinext.plugandcharge.manager.
+
+2. Class Setup
+Global Variables:
+mPlugAndChargeManager: An instance of PlugAndChargeManager, which is the class being tested.
+mService: A mocked version of IPlugAndCharge, which represents the backend service.
+mContext: A mocked Android Context.
+mAvailabilityListener: A mocked listener for service availability.
+@Before setup() Method:
+Initializes the mocks.
+Creates a new PlugAndChargeManager instance.
+Sets the connection status to true for testing.
+
+3. Dummy Data Generation
+getDummyRootCertificate() and getDummyContractCertificate() create lists of root and contract certificates for testing.
+
+4. Test Cases
+There are multiple test categories:
+
+4.1. Instance Initialization
+
+testGetInstance(): Checks that PlugAndChargeManager.getInstance() returns a non-null instance.
+4.2. Listener Registration
+
+testRegisterListener_whenServiceIsBound_withValidArgs(): Tests successful listener registration.
+testRegisterListener_whenServiceIsBound_withSameListenerMultipleTime(): Ensures the same listener is not added multiple times.
+testRegisterListener_whenServiceIsBound_listenerIsNull(): Expects a NullPointerException if the listener is null.
+testRegisterListener_whenServiceIsBound_listenerIsInvalid(): Expects an IllegalArgumentException for invalid listeners.
+4.3. Listener Unregistration
+
+testUnregisterListener_whenServiceIsBound_listenerIsNull(): Expects a NullPointerException.
+testUnregisterListener_whenServiceIsBound_listenerIsInvalid(): Expects an IllegalArgumentException.
+testUnregisterListener_whenServiceIsBound_withValidArgs(): Verifies a listener can be unregistered.
+4.4. Getters for Plug and Charge Data
+
+testGetPncActivationState_whenServiceIsBound(): Tests retrieving the PnC activation state.
+testGetActiveEmaId_whenServiceIsBound(): Tests retrieving the active EMA ID.
+testGetRootCertificateList_whenServiceIsBound(): Ensures root certificates can be fetched.
+testGetContractCertificateList_whenServiceIsBound(): Ensures contract certificates can be fetched.
+
+4.5. Asynchronous Getters
+
+testGetPncActivationStateAsync_whenServiceIsBound_withValidCallback()
+testGetActiveEmaIdAsync_whenServiceIsBound_withValidCallback()
+testGetRootCertificateListAsync_whenServiceIsBound_withValidCallback()
+These ensure asynchronous API calls work correctly.
+
+4.6. Certificate Management
+
+testDeleteContractCertificate_whenServiceIsBound_withValidArgs()
+testDeleteAllContractCertificate_whenServiceIsBound_withValidCallback()
+testSelectContractCertificate_whenServiceIsBound_withValidValue()
+testInstallContractCertificateViaEmaId_withValidValue()
+testUpdateContractCertificate_withValidEmaId()
+testSetContractName_withValidValue()
+testDeleteRootCertificate_withValidValue()
+testDeleteAllRootCertificate_withValidCallback()
+testInstallRootCertificateWithFingerprint_withValidValue()
+These validate certificate installation, deletion, and updates.
+
+4.7. Service Binding and Unbinding
+
+testBind_whenServiceBound()
+testBind_whenServiceNotBound()
+testUnbind_whenServiceBound()
+testGetPncActivationState_whenConnectionFalse()
+These test whether the service binding logic works correctly.
+
+4.8. Handling Edge Cases
+
+verify_getValueAsync_when_callBackIsNull(): Tests handling of null callbacks.
+verify_getValueAsync_when_serviceIsNotBound(): Ensures a service connection is required.
+verify_getValueAsync_for_CONTRACT_CERTIFICATE_LIST(): Validates response structure for certificate lists.
+
+5. Mocking and Utility Methods
+mockGetValueAsync(Parcelable parcel): Mocks the response of getValueAsync().
+mockManageCertificateCallBack(): Mocks the response of manageCertificate().
+
+Summary
+This test suite validates Plug and Charge Manager functionalities, including:
+
+Listener registration/unregistration.
+Fetching Plug and Charge data.
+Managing root and contract certificates.
+Service binding and error handling.
+Would you like a more detailed breakdown of a specific section?
+
+
+1. Initialization and Setup
+
+This section sets up mocks and creates a testable instance of PlugAndChargeManager.
+
+1.1. Class-Level Variables
+@Rule
+public ExpectedException expectedEx = ExpectedException.none();
+
+private PlugAndChargeManager mPlugAndChargeManager;
+private vendor.bmw.plugandcharge.IPlugAndCharge mService;
+private Context mContext;
+private AvailabilityListenerWrapper mAvailabilityListener;
+
+ExpectedException expectedEx → Allows tests to verify expected exceptions.
+mPlugAndChargeManager → The class under test.
+mService, mContext, mAvailabilityListener → Mocked dependencies.
+
+@Before
+public void setup() throws Exception {
+    mService = mock(vendor.bmw.plugandcharge.IPlugAndCharge.class);
+    mContext = mock(Context.class);
+    mAvailabilityListener = mock(AvailabilityListenerWrapper.class);
+
+    // Creating a new PlugAndChargeManager instance for testing
+    mPlugAndChargeManager = new PlugAndChargeManager(mService, true);
+    mPlugAndChargeManager.setConnectionStatus(true);
+}
+
+
+Mocks external dependencies (e.g., IPlugAndCharge service, Context).
+Creates an instance of PlugAndChargeManager.
+Sets setConnectionStatus(true) to simulate an active connection.
+
+2. Dummy Data Generation
+
+These methods create test data for validating Plug and Charge certificate retrieval.
+
+2.1. Generate Root Certificates
+private List<vendor.bmw.plugandcharge.types.RootCertificate> getDummyRootCertficate() {
+    List<vendor.bmw.plugandcharge.types.RootCertificate> resultList = new ArrayList<>();
+    vendor.bmw.plugandcharge.types.RootCertificate data = new vendor.bmw.plugandcharge.types.RootCertificate();
+    for (int i = 0; i < 5; i++) {
+        data.fingerprint = "name" + i;
+        data.errorCounter = 0;
+        data.remainingValidityDays = 2;
+        data.slotNumber = SlotNumber.STORAGE_SLOT_8.ordinal();
+        data.selectionStatus = SelectionStatus.SELECTED.ordinal();
+        data.type = CertificateType.V2G_ROOT_CERTIFICATE.ordinal();
+        data.validity = CertificateValidity.VALID.ordinal();
+        resultList.add(data);
+    }
+    return resultList;
+}
+
+private List<vendor.bmw.plugandcharge.types.RootCertificate> getDummyRootCertficate() {
+    List<vendor.bmw.plugandcharge.types.RootCertificate> resultList = new ArrayList<>();
+    vendor.bmw.plugandcharge.types.RootCertificate data = new vendor.bmw.plugandcharge.types.RootCertificate();
+    for (int i = 0; i < 5; i++) {
+        data.fingerprint = "name" + i;
+        data.errorCounter = 0;
+        data.remainingValidityDays = 2;
+        data.slotNumber = SlotNumber.STORAGE_SLOT_8.ordinal();
+        data.selectionStatus = SelectionStatus.SELECTED.ordinal();
+        data.type = CertificateType.V2G_ROOT_CERTIFICATE.ordinal();
+        data.validity = CertificateValidity.VALID.ordinal();
+        resultList.add(data);
+    }
+    return resultList;
+}
+
+Creates 5 dummy root certificates with properties like:
+fingerprint
+validity
+slotNumber
+Used in tests to simulate real certificate lists.
+
+2.2. Generate Contract Certificates
+
+private List<vendor.bmw.plugandcharge.types.ContractCertificate> getDummyContractCertficate() {
+    List<vendor.bmw.plugandcharge.types.ContractCertificate> resultList = new ArrayList<>();
+    vendor.bmw.plugandcharge.types.ContractCertificate data = new vendor.bmw.plugandcharge.types.ContractCertificate();
+    for (int i = 0; i < 5; i++) {
+        data.emaId = "ss@" + i;
+        data.contractName = "name" + i;
+        data.visibleForSecondaryUsers = true;
+        data.errorCounter = 0;
+        data.slotNumber = SlotNumber.STORAGE_SLOT_8.ordinal();
+        data.selectionStatus = SelectionStatus.SELECTED.ordinal();
+        data.type = CertificateType.CONTRACT_CERTIFICATE.ordinal();
+        data.validity = CertificateValidity.VALID.ordinal();
+        resultList.add(data);
+    }
+    return resultList;
+}
+
+Creates 5 dummy contract certificates.
+Includes properties like emaId, contractName, validity.
+
+3. Instance and Service Tests
+
+3.1. Validate PlugAndChargeManager Singleton
+
+@Test
+public void testGetInstance() throws Exception {
+    PlugAndChargeManager plugAndChargeManager = PlugAndChargeManager.getInstance();
+    assertNotNull(plugAndChargeManager);
+}
+
+@Test
+public void testGetInstance() throws Exception {
+    PlugAndChargeManager plugAndChargeManager = PlugAndChargeManager.getInstance();
+    assertNotNull(plugAndChargeManager);
+}
+
+
+Ensures getInstance() returns a valid object.
+
+4. Listener Registration & Unregistration
+
+Tests that the manager correctly registers and unregisters listeners.
+
+4.1. Register Listener Successfully
+
+@Test
+public void testRegisterListener_whenServiceIsBound_withValidArgs() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+
+    verify(mService, times(1)).registerEventListener(
+        eq(LegacyMapper.toPlugAndChargeDataType(listener.getId())),
+        any(IPlugAndChargeListener.class),
+        any(ICallStatusCallback.class)
+    );
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+}
+
+Mocks IActiveEmaIdCallback and registers a listener.
+Verifies that registerEventListener() is called once.
+Asserts that the client map size is updated.
+
+4.2. Register Listener Multiple Times
+
+@Test
+public void testRegisterListener_whenServiceIsBound_withSameListenerMultipleTime() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize());
+
+    // Adding the same listener again
+    Listener listener1 = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener1);
+
+    assertEquals(1, mPlugAndChargeManager.getClientMapSize()); // Should not increment
+    assertNotEquals(2, mPlugAndChargeManager.getEventSize(listener1));
+}
+
+Ensures duplicate listeners are not added.
+Client map size remains 1 even if the same listener is added twice.
+
+4.3. Unregister Listener Successfully
+
+@Test
+public void testUnregisterListener_whenServiceIsBound_withValidArgs() throws Exception {
+    IActiveEmaIdCallback activeEmaIdCallback = mock(IActiveEmaIdCallback.class);
+    Listener listener = new Listener(activeEmaIdCallback);
+    mPlugAndChargeManager.registerListener(listener);
+
+    verify(mService, times(1)).registerEventListener(any(), any(), any());
+
+    mPlugAndChargeManager.unregisterListener(listener);
+    verify(mService, times(1)).unregisterEventListener(any(), any(), any());
+    assertEquals(0, mPlugAndChargeManager.getClientMapSize());
+}
+
+Registers a listener, then unregisters it.
+Verifies that unregisterEventListener() is called.
+Ensures the client map is empty after unregistering.
+
+5. Certificate Management
+
+5.1. Delete Contract Certificate
+
+@Test
+public void testDeleteContractCertificate_whenServiceIsBound_withValidArgs() throws Exception {
+    String emaId = "emaId";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteContractCertificate(emaId, callback);
+
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+}
+
+Deletes a contract certificate.
+Verifies that manageCertificate() is called.
+
+5.2. Install Contract Certificate
+
+@Test
+public void testInstallContractCertificateViaEmaId_withValidValue() throws Exception {
+    String emaId = "emaId";
+    String contractName = "contractName";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.installContractCertificateWithEmaId(emaId, contractName, true, true, callback);
+
+    verify(mService, times(1)).manageCertificate(any(ManageCertificatesRequest.class), any(ICallStatusCallback.class));
+}
+
+Simulates installing a contract certificate.
+Validates service method invocation.
+
+Conclusion
+
+This test suite ensures: ✅ PlugAndChargeManager instance is correctly initialized
+✅ Listeners are correctly registered/unregistered
+✅ Certificates can be retrieved, installed, updated, and deleted
+✅ Service binding/unbinding is properly managed
+
+Would you like me to focus on a specific part, such as error handling or async behavior?
+
+Great! Let's dive deeper into error handling and asynchronous behavior in the PlugAndChargeManagerTests suite.
+
+1. Error Handling
+
+The test suite ensures that invalid input cases are correctly handled by throwing appropriate exceptions.
+
+1.1. Null Listener Registration
+
+@Test
+public void testRegisterListener_whenServiceIsBound_listenerIsNull() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager : Provided Listener is null");
+
+    Listener listener = null;
+    mPlugAndChargeManager.registerListener(listener);
+
+    verify(mService, times(0)).registerEventListener(any(), any(), any());
+}
+
+
+What it does:
+Attempts to register a null listener.
+Expects a NullPointerException with a specific error message.
+Ensures registerEventListener() is not called.
+
+
+1.2. Invalid Listener Type
+
+@Test
+public void testRegisterListener_whenServiceIsBound_listenerIsInvalid() throws Exception {
+    expectedEx.expect(IllegalArgumentException.class);
+    expectedEx.expectMessage("PlugAndChargeManager: Listener type is not valid");
+
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    Listener listener = new Listener(callback);
+    mPlugAndChargeManager.registerListener(listener);
+
+    verify(mService, times(0)).registerEventListener(any(), any(), any());
+}
+
+Why?
+Ensures the manager rejects incorrect listener types.
+Uses a mocked CallStatusCallback as an invalid listener.
+
+1.3. Service Call Without Connection
+
+@Test
+public void testGetPncActivationState_whenConnectionFalse() throws Exception {
+    expectedEx.expect(ServiceNotReadyException.class);
+    expectedEx.expectMessage("Connect/bind to the service first before making any request!");
+
+    mPlugAndChargeManager.setConnectionStatus(false);
+    mPlugAndChargeManager.getPncActivationState();
+
+    verify(mService, times(0)).getValueAsync(any(), any());
+}
+
+Why?
+If the service is not connected, calling getPncActivationState() should fail.
+Ensures that unavailable services do not process requests.
+
+1.4. Null Callback for Async Requests
+
+@Test
+public void testGetPncActivationStateAsync_whenServiceIsBound_withNullCallback() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("Callback is null");
+
+    IPncActivationStateCallback callback = null;
+    mPlugAndChargeManager.getPncActivationStateAsync(callback);
+
+    verify(mService, times(0)).getValueAsync(any(), any());
+}
+
+Why?
+If an async function gets a null callback, the test ensures an exception is thrown.
+Verifies that the service does not execute the request.
+
+1.5. Invalid Certificate Deletion Requests
+
+@Test
+public void testDeleteContractCertificate_whenServiceIsBound_withEmptyValue() throws Exception {
+    expectedEx.expect(NullPointerException.class);
+    expectedEx.expectMessage("PlugAndChargeManager:  Provided EmaId is null");
+
+    String emaId = "";
+    CallStatusCallback callback = mock(CallStatusCallback.class);
+    mPlugAndChargeManager.deleteContractCertificate(emaId, callback);
+
+    verify(mService, times(0)).manageCertificate(any(), any());
+}
+
+Why?
+Prevents deletion with an empty EMA ID.
+Ensures service calls are not made for invalid input.
+
+2. Asynchronous Behavior
+
+The test suite ensures that async requests work correctly, verifying that they:
+
+Handle null/invalid callbacks gracefully.
+Invoke service calls correctly.
+Return expected data asynchronously.
+
+
+2.1. Mocking Async Calls
+
+The test suite mocks async responses using the mockGetValueAsync() helper method.
+
+private void mockGetValueAsync(Parcelable parcel) throws RemoteException {
+    doAnswer(invocationOnMock -> {
+        GetValueRequest request = invocationOnMock.getArgument(0);
+        PlugAndChargeCallbackWrapper plugAndChargeCallback = invocationOnMock.getArgument(1);
+
+        vendor.bmw.plugandcharge.PlugAndChargeData plugAndChargeData = new vendor.bmw.plugandcharge.PlugAndChargeData();
+        plugAndChargeData.type = request.type;
+        plugAndChargeData.payload.setParcelable(parcel);
+
+        plugAndChargeCallback.onGetValue(request.requestId, StatusCode.CallStatus.SUCCESS, plugAndChargeData);
+        return null;
+    }).when(mService).getValueAsync(any(), any());
+}
+
+How it works:
+Intercepts getValueAsync() calls.
+Creates a mock response and invokes the callback asynchronously.
+Simulates an actual async service request.
+
+2.2. Verify Async Execution
+
+@Test
+public void testGetPncActivationStateAsync_whenServiceIsBound_withValidCallback() throws Exception {
+    IPncActivationStateCallback callback = mock(IPncActivationStateCallback.class);
+    mPlugAndChargeManager.getPncActivationStateAsync(callback);
+
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+}
+
+What it checks:
+Calls getPncActivationStateAsync() with a valid callback.
+Ensures getValueAsync() is triggered exactly once.
+
+2.3. Async Contract Certificate Retrieval
+
+@Test
+public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_LIST() throws Exception {
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(
+        PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE
+    )).thenReturn(true);
+
+    List<vendor.bmw.plugandcharge.types.ContractCertificate> list = getDummyContractCertficate();
+    ContractCertificates mockParcel = new ContractCertificates();
+    mockParcel.contractCertificates = list;
+    mockGetValueAsync(mockParcel);
+
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_LIST, (requestId, callStatus, value) -> {
+        assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+        assertTrue(value instanceof ContractCertificatesResponse);
+        assertEquals(list.size(), ((ContractCertificatesResponse) value).getContractCertificates().size());
+    });
+
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+}
+
+Simulates an async request for contract certificates.
+Mocks a successful response.
+Verifies that returned data matches the expected contract certificates.
+
+2.4. Async Certificate Installation
+
+@Test
+public void verify_getValueAsync_for_CONTRACT_CERTIFICATE_INSTALLATION_STATUS() throws Exception {
+    mPlugAndChargeManager.setAvailabilityListenerWrapper(mAvailabilityListener);
+    when(mAvailabilityListener.isHalComponentAvailable(
+        PlugAndChargeServiceConnection.PlugAndChargeService.PLUG_AND_CHARGE
+    )).thenReturn(true);
+
+    ContractCertificateInstallationResult.InstallationResult data = new ContractCertificateInstallationResult.InstallationResult();
+    data.installationStatus = 1;
+    data.slotId = 1;
+    data.emaId = "emaId";
+
+    vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult mockParcel =
+        new vendor.bmw.plugandcharge.payload.ContractCertificateInstallationResult();
+    mockParcel.installationResults = Arrays.asList(data);
+    mockGetValueAsync(mockParcel);
+
+    mPlugAndChargeManager.getValueAsync(PlugAndChargeData.Type.CONTRACT_CERTIFICATE_INSTALLATION_STATUS, (requestId, callStatus, value) -> {
+        assertEquals(StatusCode.CallStatus.SUCCESS, callStatus);
+        assertTrue(value instanceof InstallationContractCertificateResponse);
+        InstallationContractCertificateResult actualData = ((InstallationContractCertificateResponse) value).getInstallationContractCertificates().get(0);
+
+        assertEquals(data.installationStatus, actualData.getInstallationStatus().ordinal());
+        assertEquals(data.slotId, actualData.getSlotId());
+        assertEquals(data.emaId, actualData.getEmaId());
+    });
+
+    verify(mService, times(1)).getValueAsync(any(GetValueRequest.class), any(IPlugAndChargeCallback.class));
+}
+
+
+Mocks the response for an async contract certificate installation request.
+Validates that installation status is returned correctly.
+Ensures service calls occur exactly once.
+
+Final Thoughts
+
+This test suite ensures: ✅ Invalid inputs throw correct exceptions
+✅ Async calls return expected results
+✅ Service calls are triggered the right number of times
+
+Would you like me to help with writing additional test cases or improving async handling?
