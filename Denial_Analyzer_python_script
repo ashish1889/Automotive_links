@@ -1,0 +1,197 @@
+denialyzer.py-
+
+import sys
+import os
+import re
+import subprocess
+import sys
+import fnmatch
+
+with_ts_dict = {}
+def process_file(filename):
+    f = open(filename, encoding='utf8', errors='ignore')
+    for line in f:
+        match = re.match(r'.*{(.*)}.* scontext=([^\s]+) tcontext=([^\s]+) tclass=([^\s]+) ',line)
+    #value = match.findall(line)
+    #for val in value:
+    #    print(val)
+        if match is not None:
+            first_id = match.group(1)
+            second_id = match.group(2)
+            third_id = match.group(3)
+            fourth_id = match.group(4)
+            #print(first_id.strip(),second_id,third_id,fourth_id)
+            denial_detail_list = with_ts_dict.get((first_id,second_id,third_id,fourth_id))
+            if denial_detail_list is None:
+                denial_detail_list=[]
+                denial_detail_list.append(filename)
+                denial_detail_list.append(line)
+                with_ts_dict[(first_id,second_id,third_id,fourth_id)]=denial_detail_list;
+            else :
+                denial_detail_list.append(line)
+                with_ts_dict[(first_id,second_id,third_id,fourth_id)]=denial_detail_list;
+            #print(line)
+
+
+def find_files(search_path):
+    with_ts_dict.clear()
+    print("searching in ", search_path)
+
+    # indexing the directory to find the requested file
+    for root, dir, files in os.walk(search_path):
+        # print(files)
+        for f in files:
+            if fnmatch.fnmatch(f, '*.log'):
+                # print(file)
+                # print(os.path.join(root,file))
+                process_file(os.path.join(root,f))
+
+def find_dlt_files(search_path):
+    with_ts_dict.clear()
+    print("searching in ", search_path)
+
+    # indexing the directory to find the requested file
+    for root, dir, files in os.walk(search_path):
+        # print(files)
+        for f in files:
+            if fnmatch.fnmatch(f, '*.dlt'):
+                # print(file)
+                # print(oso.path.join(root,file))
+                logfile = os.path.join(root,f) + '.log'
+                #logfile,ext = os.path.splitext(os.path.join(root,f))
+                #logfile = logfile + '.log'
+                dltfile = os.path.join(root,f)
+                #dlt-viewer -s -u  -c ~/workspace/ecockpit/logs/DLT_logs/test_denials.dlt  test_denials.dlt.log
+                cmd = "dlt-viewer -s -u -c %s %s" % (dltfile,logfile)
+                #cmd = ['dlt-viewer', '-c' dltfile, logfile]
+                procId = subprocess.Popen(cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                procId.wait()
+
+def usage():
+    print("python3 denialyzer.py /home/prasadt1/workspace/ecockpit/selinux/SElinuxDLTLogs false")
+    print("python3 denialyzer.py /home/prasadt1/workspace/ecockpit/selinux/SElinuxDLTLogs true")
+    sys.exit()
+
+if __name__ == '__main__':
+    #find_dlt_files(sys.argv[1])
+    if len(sys.argv) < 3:
+        print("Enter the command line arguments ")
+        usage()
+    verbose = sys.argv[2].lower() == 'true'
+    find_files(sys.argv[1])
+    for key, value in with_ts_dict.items():
+        #print(key[0],key[1],key[2],key[3])
+        print("{} scontext={} tcontext={} tclass={}".format(key[0],key[1],key[2],key[3]))
+        if verbose:
+            print('***********************************************')
+            for val in value:
+                print(val)
+            print('-----------------------------------------------')
+    print("Total Unique Denials : {}".format(len(with_ts_dict)))
+
+
+============================================================================================================================================================================================================================
+
+gzip_extract_logs_v2.py-
+
+import os
+import sys
+import gzip
+import re
+
+def find_gz_files(directory):
+    """
+    Recursively search the given directory for all .gz files.
+
+    Args:
+        directory (str): Path to the directory to search.
+
+    Returns:
+        list: List of paths to .gz files.
+    """
+    gz_files = []
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".gz"):
+                gz_files.append(os.path.join(root, file))
+    return gz_files
+
+def search_pattern_in_gz_files(gz_files, pattern):
+    """
+    Search for a pattern in the given .gz files.
+
+    Args:
+        gz_files (list): List of .gz file paths.
+        pattern (str): Regex pattern to search for.
+
+    Returns:
+        list: List of .gz files containing the pattern.
+    """
+    matching_files = []
+    regex = re.compile(pattern)
+    for gz_file in gz_files:
+        try:
+            with gzip.open(gz_file, 'rt', errors="replace") as f:
+                for line in f:
+                    if regex.search(line):
+                        matching_files.append(gz_file)
+                        break
+        except Exception as e:
+            print(f"Reading {gz_file}: Done")
+    return matching_files
+
+def extract_gz_files(gz_files):
+    """
+    Extract the given .gz files to their respective directories with the same name.
+
+    Args:
+        gz_files (list): List of .gz file paths.
+    """
+    for gz_file in gz_files:
+        try:
+            output_file = gz_file[:-3]  # Remove the .gz extension
+            with gzip.open(gz_file, 'rb') as f_in, open(output_file, 'wb') as f_out:
+                chunk = f_in.read(1024)  # Read the first chunk
+                while chunk:  # Continue until no more data
+                    f_out.write(chunk)
+                    chunk = f_in.read(1024)
+            print(f"Extracted {gz_file} to {output_file}")
+        except OSError as e:
+            #print(f"Error extracting {gz_file}: {e}")
+            if "end-of-stream marker" in str(e):
+                print(f"Warning: {gz_file} appears to be incomplete or corrupted.")
+        except Exception as e:
+            #print(f"Unexpected error with {gz_file}: {e}")
+            print(f"Extracting File {gz_file} done")
+
+# Main Program
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python3 gzip_extract_logs_v2.py <path to logs> <time of issue>")
+        sys.exit(1)
+
+    directory = sys.argv[1]
+    pattern = sys.argv[2]
+
+    # Step 1: Find all .gz files
+    gz_files = find_gz_files(directory)
+    print(f"Found {len(gz_files)} .gz files.")
+
+    # Step 2: Search for the pattern in .gz files
+    matching_files = search_pattern_in_gz_files(gz_files, pattern)
+    print(f"Found {len(matching_files)} files matching the pattern.")
+
+    # Step 3: Extract matching .gz files
+    if matching_files:
+        extract_gz_files(matching_files)
+    else:
+        print("No matching files to extract.")
+
+================================================================================================================================================================================================================================
+
+Readme-
+This script does the following:
+1.Convert the provided DLT logs to log format
+2.Extract all the unique denials 
+3.Publish the denials in both verbose and non-verbose modes
+
