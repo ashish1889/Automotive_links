@@ -90,6 +90,92 @@ if __name__ == '__main__':
     print("Total Unique Denials : {}".format(len(with_ts_dict)))
 
 
+Explaination-
+
+This Python script is designed to analyze SELinux denial logs, particularly those stored in DLT (Diagnostic Log and Trace) files. 
+Here's a breakdown of what the code does:
+
+Overview
+
+The script processes log files (both .log and .dlt formats) containing SELinux denial messages, extracts relevant information, 
+and organizes them for analysis.
+
+Key Components
+
+1. Global Dictionary
+
+with_ts_dict = {}
+
+Stores processed denial entries with their contexts as keys and matching log lines as values
+2. process_file() Function
+
+Processes individual log files to extract SELinux denial information:
+
+Opens the file with UTF-8 encoding (ignoring errors)
+Uses regex to match lines containing SELinux denial patterns:
+
+r'.*{(.*)}.* scontext=([^\s]+) tcontext=([^\s]+) tclass=([^\s]+) '
+
+Captures:
+Audit ID (in curly braces)
+Source context (scontext)
+Target context (tcontext)
+Target class (tclass)
+Stores matches in with_ts_dict with:
+Key: Tuple of (audit ID, scontext, tcontext, tclass)
+Value: List of log lines containing this pattern
+3. find_files() Function
+
+Searches for .log files in a directory tree:
+
+Clears the global dictionary
+Walks through all directories starting from search_path
+Processes each .log file found
+
+4. find_dlt_files() Function
+
+Handles DLT files specifically:
+
+Clears the global dictionary
+Finds all .dlt files in the directory tree
+For each DLT file:
+Creates a corresponding .log filename
+Uses dlt-viewer command-line tool to convert DLT to log format
+Executes the conversion via subprocess
+5. Main Execution
+
+Checks command-line arguments:
+Requires a path and a boolean ('true'/'false') for verbose output
+
+
+Calls find_files() to process logs
+Prints results:
+Summary of unique denials (without details if not verbose)
+Full log lines for each denial if verbose mode is enabled
+Reports total count of unique denials
+Usage Examples
+
+# Basic usage (non-verbose)
+python3 denialyzer.py /path/to/logs false
+
+# Verbose output
+python3 denialyzer.py /path/to/logs true
+
+Key Features
+
+SELinux Specific Parsing: Focuses on extracting SELinux denial contexts
+DLT File Support: Can process binary DLT files by converting them to text logs
+Duplicate Handling: Groups identical denials together
+Flexible Output: Can show either summaries or detailed logs
+Limitations/Notes
+
+Requires dlt-viewer tool to be available in PATH for DLT file processing
+The regex pattern is specific to a particular SELinux log format
+Error handling is minimal - assumes files are readable and formats are correct
+The DLT conversion creates temporary .log files alongside the original DLT files
+The script appears to be part of a larger SELinux denial analysis toolchain, likely used for debugging or security auditing purposes.
+
+
 ============================================================================================================================================================================================================================
 
 gzip_extract_logs_v2.py-
@@ -187,6 +273,84 @@ if __name__ == "__main__":
     else:
         print("No matching files to extract.")
 
+
+Explaination-
+
+This Python script is designed to search for and extract compressed .gz log files that contain a specific pattern (typically related to a time of issue or other search term). Here's a detailed explanation:
+
+1. Key Functions
+
+find_gz_files(directory)
+
+Purpose: Recursively searches a directory for .gz files.
+How it works:
+Uses os.walk() to traverse all subdirectories.
+Checks if a file ends with .gz and collects its full path.
+Returns: A list of .gz file paths.
+
+search_pattern_in_gz_files(gz_files, pattern)
+
+Purpose: Searches inside .gz files for a given regex pattern.
+How it works:
+Opens each .gz file in text mode ('rt') with error handling.
+Uses re.compile() to compile the regex pattern.
+If a match is found, the file is added to matching_files.
+Returns: A list of .gz files containing the pattern.
+
+
+extract_gz_files(gz_files)
+
+Purpose: Extracts .gz files to their original (uncompressed) form.
+How it works:
+Removes the .gz extension from the filename.
+Reads the compressed file in chunks (1024 bytes at a time) and writes them to the output file.
+Handles incomplete/corrupted files gracefully.
+Output: Prints extraction status or errors.
+
+2. Main Program Flow
+
+Command-Line Arguments Check:
+Requires two arguments:
+<path to logs>: Directory to search for .gz files.
+<time of issue>: Regex pattern to search for (e.g., "2023-10-01 12:00").
+If arguments are missing, prints usage and exits.
+Step 1: Find .gz Files
+Calls find_gz_files() to get all .gz files in the directory.
+Step 2: Search for the Pattern
+Calls search_pattern_in_gz_files() to filter files containing the pattern.
+Step 3: Extract Matching Files
+If matches are found, extracts them using extract_gz_files().
+If no matches, prints a message.
+
+3. Key Features
+
+✅ Recursive Search: Finds .gz files in all subdirectories.
+✅ Efficient Pattern Matching: Uses regex to search inside compressed files without full extraction.
+✅ Chunk-Based Extraction: Avoids memory issues by reading/writing in 1024-byte chunks.
+✅ Error Handling:
+
+Skips corrupted/incomplete .gz files (e.g., missing end-of-stream marker).
+Uses errors="replace" to handle encoding issues.
+✅ Progress Feedback: Prints status updates (e.g., "Extracted X to Y").
+
+4. Example Usage
+
+python3 gzip_extract_logs_v2.py /var/log/ "2023-10-01 12:00"
+
+Searches: All .gz files under /var/log/ for the timestamp "2023-10-01 12:00".
+Extracts: Only the matching files (e.g., syslog.1.gz → syslog.1).
+5. Possible Improvements
+
+Parallel Processing: Speed up searching/extracting using multiprocessing.
+Better Error Logging: Log errors to a file instead of just printing.
+Dry Run Mode: Add a --dry-run flag to preview matches without extraction.
+Case-Insensitive Search: Modify regex to ignore case (e.g., re.IGNORECASE).
+
+Summary
+
+This script is useful for quickly finding and extracting relevant log entries from compressed files, particularly in 
+debugging scenarios where logs are archived in .gz format. It efficiently filters files before extraction, saving disk
+space and processing time.
 ================================================================================================================================================================================================================================
 
 Readme-
