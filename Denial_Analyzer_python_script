@@ -194,4 +194,10 @@ This script does the following:
 1.Convert the provided DLT logs to log format
 2.Extract all the unique denials 
 3.Publish the denials in both verbose and non-verbose modes
+===================================================================================================================================================================================================
+
+dlt-viewer-old -s -u -c 2024-12-11_10-05-36_2024-12-11_10-07-36_INK5_TA10121_X12345_BN_IUKETH_000024_MGU_02_UDP_000_x2eNextC.dlt logd.txt
+ 
+Current DST offset: 0 Current TimeZoneID: 0 Current UTC offset: 28800
+ 
 
