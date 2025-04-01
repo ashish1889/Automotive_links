@@ -363,5 +363,136 @@ This script does the following:
 dlt-viewer-old -s -u -c 2024-12-11_10-05-36_2024-12-11_10-07-36_INK5_TA10121_X12345_BN_IUKETH_000024_MGU_02_UDP_000_x2eNextC.dlt logd.txt
  
 Current DST offset: 0 Current TimeZoneID: 0 Current UTC offset: 28800
+
+For extraction of this time below code will work-
+
+
+import sys
+import os
+import re
+import subprocess
+import fnmatch
+
+def extract_utc_offset(line):
+    """Extract UTC offset value from a line if present"""
+    match = re.search(r'Current UTC offset:\s*(\d+)', line)
+    return match.group(1) if match else None
+
+def process_file(filename, results):
+    """Process a file to extract UTC offsets"""
+    try:
+        with open(filename, encoding='utf8', errors='ignore') as f:
+            for line in f:
+                offset = extract_utc_offset(line)
+                if offset:
+                    results.setdefault(offset, set()).add(filename)
+    except Exception as e:
+        print(f"Error processing {filename}: {str(e)}")
+
+def convert_dlt_to_log(dlt_file):
+    """Convert DLT file to log format using dlt-viewer"""
+    logfile = dlt_file + '.log'
+    cmd = f"dlt-viewer -s -u -c {dlt_file} {logfile}"
+    
+    try:
+        proc = subprocess.Popen(cmd.split(), 
+                              stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
+        proc.wait()
+        return logfile if proc.returncode == 0 else None
+    except Exception as e:
+        print(f"Error converting {dlt_file}: {str(e)}")
+        return None
+
+def scan_directory(search_path, convert_dlt=False):
+    """Scan directory for files and extract UTC offsets"""
+    results = {}
+    
+    for root, _, files in os.walk(search_path):
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            
+            if fnmatch.fnmatch(filename, '*.log'):
+                process_file(filepath, results)
+            elif convert_dlt and fnmatch.fnmatch(filename, '*.dlt'):
+                logfile = convert_dlt_to_log(filepath)
+                if logfile and os.path.exists(logfile):
+                    process_file(logfile, results)
+                    # Optional: Remove the temporary log file
+                    # os.remove(logfile)
+    
+    return results
+
+def print_results(results):
+    """Print the collected UTC offset results"""
+    if not results:
+        print("No UTC offset values found in the scanned files.")
+        return
+    
+    print("\nUTC Offset Findings:")
+    for offset, files in results.items():
+        print(f"\nFound UTC offset: {offset}")
+        print("Found in files:")
+        for filepath in files:
+            print(f" - {filepath}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 utc_offset_extractor.py <search_path> [--convert-dlt]")
+        print("\nOptions:")
+        print("--convert-dlt   Convert .dlt files to .log format before processing")
+        sys.exit(1)
+
+    search_path = sys.argv[1]
+    convert_dlt = '--convert-dlt' in sys.argv
+    
+    if not os.path.isdir(search_path):
+        print(f"Error: {search_path} is not a valid directory")
+        sys.exit(1)
+
+    print(f"Scanning directory: {search_path}")
+    if convert_dlt:
+        print("DLT conversion enabled")
+    
+    results = scan_directory(search_path, convert_dlt)
+    print_results(results)
+
+if __name__ == '__main__':
+    main()
+
+
+Key features of this simplified version:
+
+Focused Functionality:
+Only extracts UTC offset values (like 28800) from "Current UTC offset:" lines
+Removed all SELinux denial-related code
+DLT Conversion:
+Kept the DLT to log conversion capability
+Enabled with --convert-dlt flag
+Handles conversion errors gracefully
+Improved Structure:
+Better organized functions with single responsibilities
+Clear separation between file processing and conversion logic
+Proper error handling throughout
+Output Format:
+Clean reporting of found UTC offsets
+Lists all files where each offset value was found
+
+
+Usage examples:
+
+# Basic scan (log files only)
+python3 utc_offset_extractor.py /path/to/files
+
+# Scan with DLT conversion
+python3 utc_offset_extractor.py /path/to/files --convert-dlt
+
+The script will:
+
+Scan the specified directory and its subdirectories
+Process all .log files (and .dlt files if conversion is enabled)
+Extract all "Current UTC offset: X" values
+Report each unique offset value and the files where it was found
  
 
