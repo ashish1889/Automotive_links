@@ -494,5 +494,11 @@ Scan the specified directory and its subdirectories
 Process all .log files (and .dlt files if conversion is enabled)
 Extract all "Current UTC offset: X" values
 Report each unique offset value and the files where it was found
+
+===================================================================================================================================================================================
+
+For following line-
+
+IcAsilIceDetectionEES25::SubscribeUTCCustomerTimeProxy: Total UTC Customer Time offset: 480
  
 
