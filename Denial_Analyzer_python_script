@@ -500,5 +500,142 @@ Report each unique offset value and the files where it was found
 For following line-
 
 IcAsilIceDetectionEES25::SubscribeUTCCustomerTimeProxy: Total UTC Customer Time offset: 480
- 
 
+
+Here's the modified code to extract the value "480" from lines matching the pattern 
+IcAsilIceDetectionEES25::SubscribeUTCCustomerTimeProxy: Total UTC Customer Time offset: 480 in .dlt files:
+
+
+import sys
+import os
+import re
+import subprocess
+import fnmatch
+
+def extract_utc_offset(line):
+    """Extract UTC Customer Time offset value from a line if present"""
+    match = re.search(
+        r'IcAsilIceDetectionEES25::SubscribeUTCCustomerTimeProxy:\s*Total UTC Customer Time offset:\s*(\d+)', 
+        line
+    )
+    return match.group(1) if match else None
+
+def process_file(filename, results):
+    """Process a file to extract UTC Customer Time offsets"""
+    try:
+        with open(filename, encoding='utf8', errors='ignore') as f:
+            for line in f:
+                offset = extract_utc_offset(line)
+                if offset:
+                    results.setdefault(offset, set()).add(filename)
+    except Exception as e:
+        print(f"Error processing {filename}: {str(e)}")
+
+def convert_dlt_to_log(dlt_file):
+    """Convert DLT file to log format using dlt-viewer"""
+    logfile = dlt_file + '.log'
+    cmd = f"dlt-viewer -s -u -c {dlt_file} {logfile}"
+    
+    try:
+        proc = subprocess.Popen(
+            cmd.split(), 
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True
+        )
+        proc.wait()
+        return logfile if proc.returncode == 0 and os.path.exists(logfile) else None
+    except Exception as e:
+        print(f"Error converting {dlt_file}: {str(e)}")
+        return None
+
+def scan_directory(search_path, convert_dlt=False):
+    """Scan directory for files and extract UTC Customer Time offsets"""
+    results = {}
+    
+    for root, _, files in os.walk(search_path):
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            
+            if fnmatch.fnmatch(filename, '*.log'):
+                process_file(filepath, results)
+            elif convert_dlt and fnmatch.fnmatch(filename, '*.dlt'):
+                logfile = convert_dlt_to_log(filepath)
+                if logfile:
+                    process_file(logfile, results)
+                    # Optional: Remove temporary log file after processing
+                    # os.remove(logfile)
+    
+    return results
+
+def print_results(results):
+    """Print the collected UTC Customer Time offset results"""
+    if not results:
+        print("No UTC Customer Time offset values found in the scanned files.")
+        return
+    
+    print("\nUTC Customer Time Offset Findings:")
+    for offset, files in sorted(results.items(), key=lambda x: int(x[0])):
+        print(f"\nFound UTC Customer Time offset: {offset} minutes")
+        print("Found in files:")
+        for filepath in sorted(files):
+            print(f" - {filepath}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 utc_customer_offset_extractor.py <search_path> [--convert-dlt]")
+        print("\nOptions:")
+        print("--convert-dlt   Convert .dlt files to .log format before processing")
+        sys.exit(1)
+
+    search_path = sys.argv[1]
+    convert_dlt = '--convert-dlt' in sys.argv
+    
+    if not os.path.isdir(search_path):
+        print(f"Error: {search_path} is not a valid directory")
+        sys.exit(1)
+
+    print(f"Scanning directory: {search_path}")
+    if convert_dlt:
+        print("DLT conversion enabled")
+    
+    results = scan_directory(search_path, convert_dlt)
+    print_results(results)
+
+if __name__ == '__main__':
+    main()
+
+
+Key changes made:
+
+Pattern Matching:
+Updated the regex pattern to specifically match
+IcAsilIceDetectionEES25::SubscribeUTCCustomerTimeProxy: Total UTC Customer Time offset: 480
+Changed the extraction function name to reflect the new purpose
+Output Format:
+Modified the results printing to indicate we're showing "UTC Customer Time offset"
+Added "minutes" unit to the output for clarity
+Sorted the results numerically by offset value
+Error Handling:
+Improved subprocess handling with universal_newlines=True
+Added additional check for logfile existence after conversion
+Code Clarity:
+Updated all function docstrings and messages to reflect the new search pattern
+Kept the same robust file processing and conversion framework
+Usage remains the same:
+
+
+# Basic scan (log files only)
+python3 utc_customer_offset_extractor.py /path/to/files
+
+# Scan with DLT conversion
+python3 utc_customer_offset_extractor.py /path/to/files --convert-dlt
+
+
+The script will now:
+
+Specifically look for the UTC Customer Time offset pattern
+Extract the numeric value (like 480)
+Report all found values with their source files
+Handle DLT conversion when requested
