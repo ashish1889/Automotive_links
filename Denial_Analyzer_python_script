@@ -639,3 +639,8 @@ Specifically look for the UTC Customer Time offset pattern
 Extract the numeric value (like 480)
 Report all found values with their source files
 Handle DLT conversion when requested
+
+For extracting hours and minutes
+hours = int(offset) // 60
+minutes = int(offset) % 60
+print(f"\nFound UTC Customer Time offset: {hours} hours and {minutes} minutes")
