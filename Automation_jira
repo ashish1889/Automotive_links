@@ -111,3 +111,18 @@ Closes the browser.
 Replace /path/to/chromedriver with the actual path to your ChromeDriver.
 Replace /path/to/your/download/folder with your desired download directory.
 Ensure you are logged into Jira before running the script.
+
+Error-
+
+Traceback (most recent call last):
+  File "/home/ashishm22/Desktop/jira_extractor.py", line 20, in <module>
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/chrome/webdriver.py", line 45, in __init__
+    super().__init__(
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/chromium/webdriver.py", line 55, in __init__
+    self.service.start()
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/common/service.py", line 120, in start
+    raise WebDriverException(f"Can not connect to the Service {self._path}")
+selenium.common.exceptions.WebDriverException: Message: Can not connect to the Service /home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chrome
+
+
