@@ -483,6 +483,93 @@ Stacktrace:
 #1 0x609adcb96640 <unknown>
 #2 0x609adcbe7b5a <unknown>
 
+===============================================================================================================================
+
+            <div id="customfield-panel-5" class="tabs-pane">
+                        <ul class="property-list">
+                                                    <li id="rowForcustomfield_10700" class="item">
+        <div class="wrap">
+            <strong title="Meta Data" class="name">
+                                    <label for="customfield_10700">Meta Data:</label>
+                            </strong>
+            <div id="customfield_10700-val" class="value type-textarea twixified" data-fieldtype="textarea" data-fieldtypecompletekey="com.atlassian.jira.plugin.system.customfieldtypes:textarea">
+                                                  <div id="field-customfield_10700" class="twixi-block expanded">
+            <div class="twixi-wrap verbose">
+                <a href="#" class="twixi"><span class="icon-default aui-icon aui-icon-small aui-iconfont-expanded"><span>Hide</span></span></a>
+                <div class="flooded">
+                    Model series: G50, G58, G60, G61, G65, G70, G72, G78, NA0, NA1, NA5, NA6, NA7, NA8, NB0, NB5, NB6, ZA0, ZA5, ZA7<br/>
+Defect Finder Team: [AT]CoC_EI_IuK<br/>
+Lead Model Engine Type: BEV<br/>
+Owner: Michael Pichlmeier<br/>
+Phase: 04-In Progress<br/>
+Involved I-Step: Undefined<br/>
+Substatus: Integration<br/>
+Initially found at: supplier<br/>
+Reporting Relevance: Not Reporting Relevant<br/>
+Target I-Step: NA05-25-07-490<br/>
+Defect classification: Showstopper_Candidate<br/>
+First use/SoP of function: 25-07<br/>
+Tags: AQ_relevant, IuK_Cluster_25, Matrix-4A, TCD_AQ_checked, TCD_AQ_critical<br/>
+Defect Finder: QQTEE05<br/>
+Target Week: CW15<br/>
+AIDA Business Key: FE-2144523925<br/>
+<br/>
+#### MAIN-SYNC ####<br/>
+Status of last main-sync: SUCCESSFUL<br/>
+###################<br/>
+<br/>
+### ATTACHMENTS ###<br/>
+All Attachments have been synced successfully<br/>
+###################<br/>
+<br/>
+#### COMMENTS #####<br/>
+All Comments have been synced successfully<br/>
+###################<br/>
+
+                </div>
+            </div>
+            <div class="twixi-wrap concise">
+                <a href="#" class="twixi"><span class="icon-default aui-icon aui-icon-small aui-iconfont-collapsed"><span>Show</span></span></a>
+                <div class="flooded">
+                                            Model series: G50, G58, G60, G61, G65, G70, G72, G78, NA0, NA1, NA5, NA6, NA7, NA8, NB0, NB5, NB6, ZA0, ZA5, ZA7 
+Defect Finder Team: [AT]CoC_EI_IuK 
+Lead Model Engine Type: BEV 
+Owner: Michael Pichlmeier 
+Phase: 04-In Progress 
+Involved I-Step: Undefined 
+Substatus: Integration 
+Initially found at: supplier 
+Reporting Relevance: Not Reporting Relevant 
+Target I-Step: NA05-25-07-490 
+Defect classification: Showstopper_Candidate 
+First use/SoP of function: 25-07 
+Tags: AQ_relevant, IuK_Cluster_25, Matrix-4A, TCD_AQ_checked, TCD_AQ_critical 
+Defect Finder: QQTEE05 
+Target Week: CW15 
+AIDA Business Key: FE-2144523925 
+ 
+#### MAIN-SYNC #### 
+Status of last main-sync: SUCCESSFUL 
+################### 
+ 
+### ATTACHMENTS ### 
+All Attachments have been synced successfully 
+################### 
+ 
+#### COMMENTS ##### 
+All Comments have been synced successfully 
+################### 
+
+                                    </div>
+            </div>
+        </div>
+      
+                            </div>
+        </div>
+    </li>
+                                                                                                                            </ul>
+        </div>
+
 
 
 
