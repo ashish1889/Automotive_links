@@ -44,3 +44,70 @@ Update the download_directory with your preferred download location.
 Replace /path/to/chromedriver with the actual path to your ChromeDriver.
 Ensure you are logged in to Jira or handle authentication in the script.
 Run the script and check the download folder.
+
+=======================================================================================================================================
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
+import time
+
+# Set up Chrome options
+chrome_options = Options()
+download_directory = "/path/to/your/download/folder"  # Change this to your preferred download path
+chrome_options.add_experimental_option("prefs", {
+    "download.default_directory": download_directory,
+    "download.prompt_for_download": False,
+    "download.directory_upgrade": True,
+    "safebrowsing.enabled": True
+})
+
+# Set up WebDriver
+service = Service("/path/to/chromedriver")  # Update this path with your chromedriver location
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Open Jira webpage
+driver.get("https://jira.cc.bmwgroup.net/secure/StructureBoard.jspa?s=8870#")  # Update with the correct Jira URL
+time.sleep(5)  # Wait for the page to load completely
+
+# Locate and expand the "Resolved" dropdown
+try:
+    resolved_dropdown = driver.find_element(By.XPATH, "//span[contains(text(), 'RESOLVED')]")  # Update XPath if needed
+    resolved_dropdown.click()
+    time.sleep(3)  # Wait for dropdown to expand
+except Exception as e:
+    print("Failed to expand Resolved dropdown:", e)
+
+# Click on "Export" button
+try:
+    export_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Export')]")
+    export_button.click()
+    time.sleep(2)
+
+    # Click on "Export to Excel"
+    export_excel_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Export to Excel')]")
+    export_excel_button.click()
+
+    # Wait for the file to download
+    time.sleep(10)  # Adjust time based on network speed
+except Exception as e:
+    print("Export failed:", e)
+
+# Close the browser
+driver.quit()
+
+
+What This Script Does:
+Opens Jira.
+Expands the "Resolved" dropdown by clicking on it.
+Waits for it to load.
+Clicks "Export" and then "Export to Excel."
+Waits for the file to download.
+Closes the browser.
+🔧 Next Steps:
+
+Replace /path/to/chromedriver with the actual path to your ChromeDriver.
+Replace /path/to/your/download/folder with your desired download directory.
+Ensure you are logged into Jira before running the script.
