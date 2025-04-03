@@ -731,5 +731,78 @@ Stacktrace:
 ✅ Meta Data Extracted!
 ✅ Target I-Step: Not found
 ✅ Target Week: Not found
+=========================================================================================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+import re  
+
+# Set up WebDriver
+chrome_options = Options()
+service = Service("/home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chromedriver")
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Open Jira webpage
+driver.get("https://jira.cc.bmwgroup.net/secure/StructureBoard.jspa?s=8870#")  
+time.sleep(5)  # Allow page to load
+
+try:
+    wait = WebDriverWait(driver, 10)
+
+    # ✅ Step 1: Debug - Print all available tabs
+    all_tabs = driver.find_elements(By.XPATH, "//ul[contains(@class, 'tabs-menu')]//a")
+    print("🔹 Available Tabs:")
+    for tab in all_tabs:
+        print(tab.text)
+
+    # ✅ Step 2: Locate and click "Other" tab
+    try:
+        other_tab = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Other')]")))
+        print("✅ Found 'Other' tab.")
+        driver.execute_script("arguments[0].scrollIntoView();", other_tab)
+        other_tab.click()
+        time.sleep(3)  # Ensure content loads after clicking
+    except Exception as e:
+        print("❌ 'Other' tab not found or not clickable:", e)
+        print("🔹 Trying alternative method (using index-based selection)...")
+
+        # Alternative: Click on "Other" using index-based selection
+        tab_list = driver.find_elements(By.XPATH, "//ul[contains(@class, 'tabs-menu')]//a")
+        for tab in tab_list:
+            if "Other" in tab.text:
+                driver.execute_script("arguments[0].click();", tab)
+                time.sleep(3)
+                break
+
+    # ✅ Step 3: Ensure Meta Data section is fully loaded before extraction
+    try:
+        metadata_div = wait.until(EC.presence_of_element_located((By.ID, "customfield_10700-val")))
+        metadata_text = metadata_div.text
+        print("✅ Full Meta Data Extracted:\n", metadata_text)  # Debugging: Print full meta data
+    except Exception as e:
+        print("❌ Meta Data section not found:", e)
+        print("🔹 Printing full page source for debugging...")
+        print(driver.page_source)  # This will help us see if the element exists
+
+    # ✅ Step 4: Improved Regex Extraction for "Target I-Step" & "Target Week"
+    target_istep_match = re.search(r"Target I-Step:\s*([A-Z0-9\-]+)", metadata_text, re.IGNORECASE)
+    target_week_match = re.search(r"Target Week:\s*(CW\d+)", metadata_text, re.IGNORECASE)
+
+    target_istep = target_istep_match.group(1) if target_istep_match else "Not found"
+    target_week = target_week_match.group(1) if target_week_match else "Not found"
+
+    print(f"✅ Target I-Step: {target_istep}")
+    print(f"✅ Target Week: {target_week}")
+
+except Exception as e:
+    print("❌ Unexpected Error:", e)
+
+# Close browser
+driver.quit()
+
 
 
