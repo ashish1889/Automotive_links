@@ -433,4 +433,47 @@ except Exception as e:
 
 driver.quit()
 
+======================================================================================================
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import time
+
+# Set up Chrome options
+chrome_options = Options()
+service = Service("/home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chromedriver")
+
+# Launch WebDriver
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Open Jira webpage
+driver.get("https://jira.cc.bmwgroup.net/secure/StructureBoard.jspa?s=8870#")  # Update with correct Jira URL
+time.sleep(5)  # Allow page to load
+
+try:
+    # Click on the "Other" tab
+    other_tab = driver.find_element(By.XPATH, "//a[contains(text(), 'Other')]")
+    other_tab.click()
+    time.sleep(3)  # Wait for content to load
+
+    # Extract Target I-Step
+    target_istep_element = driver.find_element(By.XPATH, "//b[contains(text(), 'Target I-Step')]/following-sibling::text()")
+    target_istep = target_istep_element.text.strip()
+
+    # Extract Target Week
+    target_week_element = driver.find_element(By.XPATH, "//b[contains(text(), 'Target Week')]/following-sibling::text()")
+    target_week = target_week_element.text.strip()
+
+    print(f"Target I-Step: {target_istep}")
+    print(f"Target Week: {target_week}")
+
+except Exception as e:
+    print("Error:", e)
+
+# Close the browser
+driver.quit()
+
+
 
