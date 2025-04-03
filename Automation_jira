@@ -247,5 +247,67 @@ Stacktrace:
 #17 0x613e577e9cb6 <unknown>
 #18 0x7794fb094ac3 <unknown>
 
+============================================================================================================
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+import time
+
+# Set up Chrome options
+chrome_options = Options()
+download_directory = "/home/ashishm22/Desktop/Jira_issues/excel_resolved"
+chrome_options.add_experimental_option("prefs", {
+    "download.default_directory": download_directory,
+    "download.prompt_for_download": False,
+    "download.directory_upgrade": True,
+    "safebrowsing.enabled": True
+})
+
+# Set up WebDriver
+service = Service("/home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chromedriver")
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Open Jira webpage
+driver.get("https://jira.cc.bmwgroup.net/secure/StructureBoard.jspa?s=8870#")
+wait = WebDriverWait(driver, 15)  # Wait for elements
+
+# Try switching to iframe if necessary
+try:
+    iframe = driver.find_element(By.TAG_NAME, "iframe")
+    driver.switch_to.frame(iframe)
+    print("Switched to iframe")
+except:
+    print("No iframe found")
+
+# Locate and expand the "Resolved" dropdown
+try:
+    resolved_dropdown = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'RESOLVED')]")))
+    resolved_dropdown.click()
+    time.sleep(3)
+    print("Clicked Resolved dropdown")
+except Exception as e:
+    print("Failed to expand Resolved dropdown:", e)
+
+# Click on "Export" button
+try:
+    export_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Export')]")))
+    export_button.click()
+    time.sleep(2)
+
+    export_excel_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Export to Excel')]")))
+    export_excel_button.click()
+
+    time.sleep(10)  # Wait for download
+    print("Export successful")
+except Exception as e:
+    print("Export failed:", e)
+
+driver.quit()
 
 
