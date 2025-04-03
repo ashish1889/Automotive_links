@@ -475,5 +475,14 @@ except Exception as e:
 # Close the browser
 driver.quit()
 
+=============================================================================================
+Error: Message: no such element: Unable to locate element: {"method":"xpath","selector":"//a[contains(text(), 'Other')]"}
+  (Session info: chrome=135.0.7049.52); For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#no-such-element-exception
+Stacktrace:
+#0 0x609add0e4e6a <unknown>
+#1 0x609adcb96640 <unknown>
+#2 0x609adcbe7b5a <unknown>
+
+
 
 
