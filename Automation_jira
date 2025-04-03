@@ -197,4 +197,9 @@ selenium.common.exceptions.SessionNotCreatedException: Message: session not crea
 Current browser version is 134.0.6998.117 with binary path /opt/google/chrome/chrome
 
 
+sudo apt update
+sudo apt --only-upgrade install google-chrome-stable
+google-chrome --version  # Verify updated version
+
+
 
