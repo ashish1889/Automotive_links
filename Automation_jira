@@ -309,5 +309,51 @@ except Exception as e:
     print("Export failed:", e)
 
 driver.quit()
+==========================================================================================================================================================
+
+No iframe found
+Failed to expand Resolved dropdown: Message: 
+Stacktrace:
+#0 0x63b971a74e6a <unknown>
+#1 0x63b971526640 <unknown>
+#2 0x63b971577b5a <unknown>
+#3 0x63b971577d51 <unknown>
+#4 0x63b9715c6344 <unknown>
+#5 0x63b97159d77d <unknown>
+#6 0x63b9715c37b5 <unknown>
+#7 0x63b97159d523 <unknown>
+#8 0x63b971569ef3 <unknown>
+#9 0x63b97156ab51 <unknown>
+#10 0x63b971a39d2b <unknown>
+#11 0x63b971a3dc01 <unknown>
+#12 0x63b971a21512 <unknown>
+#13 0x63b971a3e774 <unknown>
+#14 0x63b971a0590f <unknown>
+#15 0x63b971a62fb8 <unknown>
+#16 0x63b971a63196 <unknown>
+#17 0x63b971a73cb6 <unknown>
+#18 0x71b879894ac3 <unknown>
+
+Export failed: Message: 
+Stacktrace:
+#0 0x63b971a74e6a <unknown>
+#1 0x63b971526640 <unknown>
+#2 0x63b971577b5a <unknown>
+#3 0x63b971577d51 <unknown>
+#4 0x63b9715c6344 <unknown>
+#5 0x63b97159d77d <unknown>
+#6 0x63b9715c37b5 <unknown>
+#7 0x63b97159d523 <unknown>
+#8 0x63b971569ef3 <unknown>
+#9 0x63b97156ab51 <unknown>
+#10 0x63b971a39d2b <unknown>
+#11 0x63b971a3dc01 <unknown>
+#12 0x63b971a21512 <unknown>
+#13 0x63b971a3e774 <unknown>
+#14 0x63b971a0590f <unknown>
+#15 0x63b971a62fb8 <unknown>
+#16 0x63b971a63196 <unknown>
+#17 0x63b971a73cb6 <unknown>
+#18 0x71b879894ac3 <unknown>
 
 
