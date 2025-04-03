@@ -124,5 +124,77 @@ Traceback (most recent call last):
   File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/common/service.py", line 120, in start
     raise WebDriverException(f"Can not connect to the Service {self._path}")
 selenium.common.exceptions.WebDriverException: Message: Can not connect to the Service /home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chrome
+================================================================================================================================================================================
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
+import time
+
+# Set up Chrome options
+chrome_options = Options()
+download_directory = "/home/ashishm22/Desktop/Jira_issues/excel_resolved"  # Change this to your preferred download path
+chrome_options.add_experimental_option("prefs", {
+    "download.default_directory": download_directory,
+    "download.prompt_for_download": False,
+    "download.directory_upgrade": True,
+    "safebrowsing.enabled": True
+})
+
+# Set up WebDriver
+service = Service("/home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chromedriver")  # Update this path with your chromedriver location
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Open Jira webpage
+driver.get("https://jira.cc.bmwgroup.net/secure/StructureBoard.jspa?s=8870#")  # Update with the correct Jira URL
+time.sleep(5)  # Wait for the page to load completely
+
+# Locate and expand the "Resolved" dropdown
+try:
+    resolved_dropdown = driver.find_element(By.XPATH, "//span[contains(text(), 'RESOLVED')]")  # Update XPath if needed
+    resolved_dropdown.click()
+    time.sleep(3)  # Wait for dropdown to expand
+except Exception as e:
+    print("Failed to expand Resolved dropdown:", e)
+
+# Click on "Export" button
+try:
+    export_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Export')]")
+    export_button.click()
+    time.sleep(2)
+
+    # Click on "Export to Excel"
+    export_excel_button = driver.find_element(By.XPATH, "//span[contains(text(), 'Export to Excel')]")
+    export_excel_button.click()
+
+    # Wait for the file to download
+    time.sleep(10)  # Adjust time based on network speed
+except Exception as e:
+    print("Export failed:", e)
+
+# Close the browser
+driver.quit()
+
+
+Traceback (most recent call last):
+  File "/home/ashishm22/Desktop/jira_extractor.py", line 20, in <module>
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/chrome/webdriver.py", line 45, in __init__
+    super().__init__(
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/chromium/webdriver.py", line 66, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/remote/webdriver.py", line 250, in __init__
+    self.start_session(capabilities)
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/remote/webdriver.py", line 342, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/remote/webdriver.py", line 429, in execute
+    self.error_handler.check_response(response)
+  File "/home/ashishm22/.local/lib/python3.10/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: This version of ChromeDriver only supports Chrome version 135
+Current browser version is 134.0.6998.117 with binary path /opt/google/chrome/chrome
+
 
 
