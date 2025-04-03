@@ -201,5 +201,51 @@ sudo apt update
 sudo apt --only-upgrade install google-chrome-stable
 google-chrome --version  # Verify updated version
 
+Failed to expand Resolved dropdown: Message: no such element: Unable to locate element: {"method":"xpath","selector":"//span[contains(text(), 'RESOLVED')]"}
+  (Session info: chrome=135.0.7049.52); For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#no-such-element-exception
+Stacktrace:
+#0 0x613e577eae6a <unknown>
+#1 0x613e5729c640 <unknown>
+#2 0x613e572edb5a <unknown>
+#3 0x613e572edd51 <unknown>
+#4 0x613e5733c344 <unknown>
+#5 0x613e5731377d <unknown>
+#6 0x613e573397b5 <unknown>
+#7 0x613e57313523 <unknown>
+#8 0x613e572dfef3 <unknown>
+#9 0x613e572e0b51 <unknown>
+#10 0x613e577afd2b <unknown>
+#11 0x613e577b3c01 <unknown>
+#12 0x613e57797512 <unknown>
+#13 0x613e577b4774 <unknown>
+#14 0x613e5777b90f <unknown>
+#15 0x613e577d8fb8 <unknown>
+#16 0x613e577d9196 <unknown>
+#17 0x613e577e9cb6 <unknown>
+#18 0x7794fb094ac3 <unknown>
+
+Export failed: Message: no such element: Unable to locate element: {"method":"xpath","selector":"//button[contains(text(), 'Export')]"}
+  (Session info: chrome=135.0.7049.52); For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#no-such-element-exception
+Stacktrace:
+#0 0x613e577eae6a <unknown>
+#1 0x613e5729c640 <unknown>
+#2 0x613e572edb5a <unknown>
+#3 0x613e572edd51 <unknown>
+#4 0x613e5733c344 <unknown>
+#5 0x613e5731377d <unknown>
+#6 0x613e573397b5 <unknown>
+#7 0x613e57313523 <unknown>
+#8 0x613e572dfef3 <unknown>
+#9 0x613e572e0b51 <unknown>
+#10 0x613e577afd2b <unknown>
+#11 0x613e577b3c01 <unknown>
+#12 0x613e57797512 <unknown>
+#13 0x613e577b4774 <unknown>
+#14 0x613e5777b90f <unknown>
+#15 0x613e577d8fb8 <unknown>
+#16 0x613e577d9196 <unknown>
+#17 0x613e577e9cb6 <unknown>
+#18 0x7794fb094ac3 <unknown>
+
 
 
