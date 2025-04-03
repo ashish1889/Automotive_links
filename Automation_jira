@@ -570,6 +570,52 @@ All Comments have been synced successfully
                                                                                                                             </ul>
         </div>
 
+=======================================================================================================
 
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+import re  # Import regex for extracting text
+
+# Set up WebDriver
+chrome_options = Options()
+service = Service("/home/ashishm22/Desktop/Jira_issues/chromedriver/chromedriver-linux64/chromedriver")
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Open Jira webpage
+driver.get("https://jira.cc.bmwgroup.net/secure/StructureBoard.jspa?s=8870#")  
+time.sleep(5)  # Allow page to load
+
+try:
+    wait = WebDriverWait(driver, 10)
+
+    # ✅ Click "Other" tab by finding the tab using id-based XPath
+    other_tab = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@id='customfield-panel-5']")))
+    driver.execute_script("arguments[0].scrollIntoView();", other_tab)  # Scroll into view
+    time.sleep(2)  # Allow the tab to load properly
+
+    # ✅ Locate the Meta Data section
+    metadata_div = wait.until(EC.presence_of_element_located((By.ID, "customfield_10700-val")))
+    metadata_text = metadata_div.text  # Extract full text
+
+    # ✅ Use regex to extract "Target I-Step" and "Target Week"
+    target_istep_match = re.search(r"Target I-Step:\s*([\w-]+)", metadata_text)
+    target_week_match = re.search(r"Target Week:\s*(CW\d+)", metadata_text)
+
+    target_istep = target_istep_match.group(1) if target_istep_match else "Not found"
+    target_week = target_week_match.group(1) if target_week_match else "Not found"
+
+    print(f"✅ Target I-Step: {target_istep}")
+    print(f"✅ Target Week: {target_week}")
+
+except Exception as e:
+    print("❌ Error:", e)
+
+# Close browser
+driver.quit()
 
 
